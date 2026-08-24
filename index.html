@@ -191,6 +191,10 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px;background:#fff}
 .btn-lock{border:none;background:rgba(255,255,255,.15);color:#fff;padding:8px 10px;border-radius:9px;cursor:pointer;font-size:15px}
 .btn-lock:hover{background:rgba(255,255,255,.28)}
 
+/* 超预警 */
+.warn-banner{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;padding:9px 14px;border-radius:9px;font-size:13.5px;margin-bottom:12px}
+.cal-day.warn{border-color:#f87171;background:#fef2f2}
+
 </style>
 </head>
 <body>
@@ -293,6 +297,13 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px;background:#fff}
       <div class="card"><h3><span class="bar"></span>本月每日采购金额</h3><div class="chart-box" id="report-daily"></div></div>
     </div>
     <div class="card"><h3><span class="bar"></span>近 12 个月采购金额趋势</h3><div class="chart-box" id="report-trend"></div></div>
+    <div class="card">
+      <h3><span class="bar"></span>月度看板 · 每日预实对比</h3>
+      <div class="kpis" id="report-board-kpis" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:12px"></div>
+      <div class="chart-box" id="report-board-chart"></div>
+      <div class="tbl-wrap" id="report-board-table" style="margin-top:12px"></div>
+      <div class="hint" style="margin-top:8px">实际人均超过预警线（职员 12 元 / 员工 6 元，可在系统设置调整）的天数会标记 ⚠️ 超预警。</div>
+    </div>
     <div class="grid2">
       <div class="card"><h3><span class="bar"></span>本月 vs 上月 类别对比</h3><div class="chart-box" id="report-compare"></div></div>
       <div class="card"><h3><span class="bar"></span>采购金额 Top 10 食材</h3><div class="chart-box" id="report-top"></div></div>
@@ -433,7 +444,7 @@ function monthDays(y,m){ return new Date(y,m,0).getDate(); }
 var state = loadState();
 var DEFAULT_PASS_HASH = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92';
 function defaultStandards(){
-  return { '职员':{cond:0.35, grain:1.84}, '员工':{cond:0.33, grain:1.56} };
+  return { '职员':{cond:0.35, grain:1.84, warn:12}, '员工':{cond:0.33, grain:1.56, warn:6} };
 }
 function defaultSettings(){ return { standards:defaultStandards(), passHash:DEFAULT_PASS_HASH }; }
 var appUnlocked = false;
@@ -492,9 +503,11 @@ function savePassword(){
 function stdFor(group){
   var st = state.settings && state.settings.standards ? state.settings.standards : null;
   var s = st ? st[group] : null;
-  if(!s) s = (defaultStandards()[group]) || {cond:0.35, grain:1.84};
-  return { cond: Number(s.cond)||0, grain: Number(s.grain)||0 };
+  if(!s) s = (defaultStandards()[group]) || {cond:0.35, grain:1.84, warn:12};
+  return { cond: Number(s.cond)||0, grain: Number(s.grain)||0, warn: Number(s.warn)||0 };
 }
+function warnFor(group){ return stdFor(group).warn; }
+function isOverWarn(group, perCapita){ var w = warnFor(group); return w>0 && Number(perCapita)>w; }
 function stdCond(group){ return stdFor(group).cond; }
 function stdGrain(group){ return stdFor(group).grain; }
 function loadState(){
@@ -566,9 +579,13 @@ function daySummary(date, group){
   var cond = r2(items.filter(function(it){ return it.category==='调料品'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
   var grain = r2(items.filter(function(it){ return it.category==='油类'||it.category==='米面类'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
   var food = r2(total-cond-grain);
-  var p = people>0?people:1;
-  return { recs:recs, people:people, total:total, cond:cond, grain:grain, food:food, perCapita:r2(total/p), perFood:r2(food/p), perCond:r2(cond/p), perGrain:r2(grain/p) };
+  var perCapita = people>0 ? r2(total/people) : 0;
+  var perFood = people>0 ? r2(food/people) : 0;
+  var perCond = people>0 ? r2(cond/people) : 0;
+  var perGrain = people>0 ? r2(grain/people) : 0;
+  return { recs:recs, people:people, total:total, cond:cond, grain:grain, food:food, perCapita:perCapita, perFood:perFood, perCond:perCond, perGrain:perGrain };
 }
+function pcText(v, people){ return people>0 ? '¥'+money(v) : '—'; }
 
 function prevDay(dateStr){
   var d = new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()-1);
@@ -593,8 +610,8 @@ function monthSummary(year, month, group){
   items.forEach(function(it){ var c=it.category||'未分类'; byCat[c]=(byCat[c]||0)+(Number(it.qty)||0)*(Number(it.price)||0); });
   var cond = r2(items.filter(function(it){ return it.category==='调料品'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
   var grain = r2(items.filter(function(it){ return it.category==='油类'||it.category==='米面类'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
-  var p = people>0?people:1;
-  return { recs:recs, people:people, total:total, cond:cond, grain:grain, byCat:byCat, perCapita:r2(total/p) };
+  var perCapita = people>0 ? r2(total/people) : 0;
+  return { recs:recs, people:people, total:total, cond:cond, grain:grain, byCat:byCat, perCapita:perCapita };
 }
 function monthRecsPrev(year, month){ var d=new Date(year, month-2, 1); return { y:d.getFullYear(), m:d.getMonth()+1 }; }
 /* ================= 通用渲染 ================= */
@@ -730,6 +747,46 @@ function goLatestMonth(){
 /* ---------- 模态 ---------- */
 function openModal(id){ $(id).classList.remove('hidden'); }
 function closeModal(id){ $(id).classList.add('hidden'); }
+
+function dualLineChart(containerId, labels, a, b, opts){
+  opts = opts||{};
+  var el = $(containerId); if(!el) return;
+  var W=560,H=250,PL=52,PR=14,PT=18,PB=32;
+  var maxV=1;
+  a.concat(b).forEach(function(v){ if(v>maxV) maxV=v; });
+  var n = labels.length;
+  var stepX = n>1 ? (W-PL-PR)/(n-1) : 0;
+  var grid='', pts='', labelsXml='';
+  for(var i=0;i<=4;i++){
+    var y = PT+(H-PT-PB)*(i/4);
+    grid += '<line x1="'+PL+'" y1="'+y.toFixed(1)+'" x2="'+(W-PR)+'" y2="'+y.toFixed(1)+'" stroke="#eef1ef"/>';
+    grid += '<text x="'+(PL-6)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="10" fill="#9ca3af">'+(maxV*(4-i)/4).toFixed(1)+'</text>';
+  }
+  function seriesPath(vals){
+    var coords = vals.map(function(v,i){
+      var x = n>1 ? PL+i*stepX : PL+(W-PL-PR)/2;
+      var y = H-PB-(H-PT-PB)*(v/maxV);
+      return {x:x,y:y};
+    });
+    var path = n>1 ? 'M'+coords[0].x.toFixed(1)+' '+coords[0].y.toFixed(1) : '';
+    for(var k=1;k<n;k++) path += ' L'+coords[k].x.toFixed(1)+' '+coords[k].y.toFixed(1);
+    return {path:path, coords:coords};
+  }
+  var pa = seriesPath(a), pb = seriesPath(b);
+  if(n>1){
+    pts += '<path d="'+pa.path+'" fill="none" stroke="'+(opts.colorA||'#2563eb')+'" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>';
+    pts += '<path d="'+pb.path+'" fill="none" stroke="'+(opts.colorB||'#f59e0b')+'" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>';
+  }
+  for(var j=0;j<n;j++){
+    pts += '<circle cx="'+pa.coords[j].x.toFixed(1)+'" cy="'+pa.coords[j].y.toFixed(1)+'" r="3" fill="#fff" stroke="'+(opts.colorA||'#2563eb')+'" stroke-width="2"/>';
+    pts += '<circle cx="'+pb.coords[j].x.toFixed(1)+'" cy="'+pb.coords[j].y.toFixed(1)+'" r="3" fill="#fff" stroke="'+(opts.colorB||'#f59e0b')+'" stroke-width="2"/>';
+    labelsXml += '<text x="'+pa.coords[j].x.toFixed(1)+'" y="'+(H-PB+16)+'" text-anchor="middle" font-size="10" fill="#6b7280">'+esc(String(labels[j]))+'</text>';
+  }
+  el.innerHTML = '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%">'+grid+pts+labelsXml+'</svg>'+
+    '<div class="chart-legend"><span class="lg-item"><span class="dot" style="background:'+(opts.colorA||'#2563eb')+'"></span>'+(opts.nameA||'实际')+'</span>'+
+    '<span class="lg-item"><span class="dot" style="background:'+(opts.colorB||'#f59e0b')+'"></span>'+(opts.nameB||'预测')+'</span></div>';
+}
+
 /* ================= 工作台 ================= */
 function renderDashboard(){
   var t = todayStr();
@@ -792,7 +849,8 @@ function renderDashboard(){
   $('dash-recent').innerHTML = '<table class="tbl"><thead><tr><th>日期</th><th>人员</th><th>人数</th><th class="num">食材项数</th><th class="num">采购金额</th><th class="num">人均费用</th></tr></thead><tbody>'+
     recent.map(function(r){
       var sum = daySummary(r.date, r.group);
-      return '<tr style="cursor:pointer" onclick="openDayModal(\''+r.date+'\',\''+r.group+'\')"><td>'+r.date+'</td><td><span class="tag tag-grp">'+esc(r.group)+'</span></td><td>'+r.people+'</td><td class="num">'+r.items.length+' 项</td><td class="num" style="font-weight:700;color:var(--primary-dark)">¥'+money(sum.total)+'</td><td class="num">¥'+money(sum.perCapita)+'</td></tr>';
+      var over = isOverWarn(r.group, sum.perCapita);
+      return '<tr style="cursor:pointer" onclick="openDayModal(\''+r.date+'\',\''+r.group+'\')"><td>'+r.date+'</td><td><span class="tag tag-grp">'+esc(r.group)+'</span></td><td>'+r.people+'</td><td class="num">'+r.items.length+' 项</td><td class="num" style="font-weight:700;color:var(--primary-dark)">¥'+money(sum.total)+'</td><td class="num">'+(over?'<span class="cmp-up">¥'+money(sum.perCapita)+' ⚠️</span>':'¥'+money(sum.perCapita))+'</td></tr>';
     }).join('')+'</tbody></table>';
 }
 
@@ -824,15 +882,17 @@ function renderEntrySheet(){
   var prev = daySummary(prevDay(date), g);
   var pred = dayPredict(date, g);
   var prevPred = dayPredict(prevDay(date), g);
+  var over = isOverWarn(g, sum.perCapita);
   var sheet = $('entry-sheet');
   var html = '<div class="card">';
   html += '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px">'+
     '<div style="font-size:17px;font-weight:700">'+date.slice(5).replace('-','月')+'日 '+esc(g)+'餐总费用</div>'+
     '<div style="font-size:22px;font-weight:700;color:var(--primary-dark)">¥'+money(sum.total)+'</div>'+
     '<div style="font-size:12px;color:var(--muted)">'+(rec?rec.items.length:0)+' 项食材 · '+sum.people+' 人次</div></div>';
+  if(over){ html += '<div class="warn-banner">⚠️ <b>今日人均 ¥'+money(sum.perCapita)+' 已超过预警线 ¥'+money(warnFor(g))+'（'+esc(g)+'）</b></div>'; }
   html += '<div class="tbl-wrap" style="margin-bottom:14px"><table class="tbl"><thead><tr><th style="min-width:72px"></th><th class="num">采购食材费用</th><th class="num">就餐人次</th><th class="num">人均食材费用</th><th class="num">人均粮油</th><th class="num">人均调味料</th><th class="num">当日人均</th><th class="num">预测人均</th></tr></thead><tbody>'+
-    '<tr><td><b>今日</b></td><td class="num">¥'+money(sum.food)+'</td><td class="num">'+sum.people+'</td><td class="num">¥'+money(sum.perFood)+'</td><td class="num">'+money(stdGrain(g))+'</td><td class="num">'+money(stdCond(g))+'</td><td class="num">¥'+money(sum.perCapita)+'</td><td class="num">¥'+money(pred)+'</td></tr>'+
-    '<tr><td>昨日</td><td class="num">¥'+money(prev.food)+'</td><td class="num">'+prev.people+'</td><td class="num">¥'+money(prev.perFood)+'</td><td class="num">'+money(stdGrain(g))+'</td><td class="num">'+money(stdCond(g))+'</td><td class="num">¥'+money(prev.perCapita)+'</td><td class="num">¥'+money(prevPred)+'</td></tr>'+
+    '<tr><td><b>今日</b></td><td class="num">¥'+money(sum.food)+'</td><td class="num">'+sum.people+'</td><td class="num">'+pcText(sum.perFood, sum.people)+'</td><td class="num">'+money(stdGrain(g))+'</td><td class="num">'+money(stdCond(g))+'</td><td class="num">'+(sum.people>0?(over?'<span class="cmp-up">¥'+money(sum.perCapita)+' ⚠️</span>':'¥'+money(sum.perCapita)):'—')+'</td><td class="num">'+pcText(pred, sum.people)+'</td></tr>'+
+    '<tr><td>昨日</td><td class="num">¥'+money(prev.food)+'</td><td class="num">'+prev.people+'</td><td class="num">'+pcText(prev.perFood, prev.people)+'</td><td class="num">'+money(stdGrain(g))+'</td><td class="num">'+money(stdCond(g))+'</td><td class="num">'+pcText(prev.perCapita, prev.people)+'</td><td class="num">'+pcText(prevPred, prev.people)+'</td></tr>'+
     '<tr><td>对比增减</td><td class="num">'+fmtDiff(sum.food-prev.food,'')+'</td><td class="num">'+fmtDiff(sum.people-prev.people,'')+'</td><td class="num">'+fmtDiff(sum.perFood-prev.perFood,'')+'</td><td class="num">0</td><td class="num">0</td><td class="num">'+fmtDiff(sum.perCapita-prev.perCapita,'')+'</td><td class="num">'+fmtDiff(pred-prevPred,'')+'</td></tr>'+
     '</tbody></table></div>';
   html += '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'+
@@ -999,9 +1059,12 @@ function renderLedger(){
     if(group==='全部' && has && sum.recs.length){
       grpTags = sum.recs.map(function(r){ return '<span class="tag tag-grp" style="font-size:10px;padding:0 5px">'+esc(r.group)+'</span>'; }).join('');
     }
-    html += '<div class="cal-day'+(isToday?' today':'')+'" onclick="openDayModal(\''+ds+'\',\''+group+'\')">'+
+    var anyOver = has ? (group==='全部'
+      ? sum.recs.some(function(r){ return isOverWarn(r.group, daySummary(ds, r.group).perCapita); })
+      : isOverWarn(group, sum.perCapita)) : false;
+    html += '<div class="cal-day'+(isToday?' today':'')+(anyOver?' warn':'')+'" onclick="openDayModal(\''+ds+'\',\''+group+'\')">'+
       '<div class="dnum"><b>'+d+'</b> 周'+WEEK_CN[new Date(ds+'T00:00:00').getDay()]+'</div>'+
-      (has?('<div class="dsum">¥'+money(sum.total)+'</div><div class="dpeo">'+sum.people+' 人次</div>'+grpTags):'')+
+      (has?('<div class="dsum">¥'+money(sum.total)+(anyOver?' ⚠️':'')+'</div><div class="dpeo">'+sum.people+' 人次</div>'+grpTags):'')+
       '</div>';
   }
   $('ledger-calendar').innerHTML = html;
@@ -1042,10 +1105,10 @@ function renderLedger(){
           (showGroup?'<td><span class="tag tag-grp">'+esc(r.g)+'</span></td>':'')+
           '<td class="center">'+dow+'</td>'+
           '<td class="num">'+(r.sum.people||'—')+'</td><td class="num" style="font-weight:700">¥'+money(r.sum.total)+'</td>'+
-          '<td class="num">¥'+money(r.sum.perFood)+'</td>'+
-          '<td class="num">¥'+money(stdCond(r.g))+'</td><td class="num">'+expCell(r.sum.perCond, stdCond(r.g))+'</td>'+
-          '<td class="num">¥'+money(stdGrain(r.g))+'</td><td class="num">'+expCell(r.sum.perGrain, stdGrain(r.g))+'</td>'+
-          '<td class="num">¥'+money(r.sum.perCapita)+'</td><td class="num" style="font-weight:600">¥'+money(r.pred)+'</td>'+
+          '<td class="num">'+pcText(r.sum.perFood, r.sum.people)+'</td>'+
+          '<td class="num">¥'+money(stdCond(r.g))+'</td><td class="num">'+(r.sum.people>0?expCell(r.sum.perCond, stdCond(r.g)):'—')+'</td>'+
+          '<td class="num">¥'+money(stdGrain(r.g))+'</td><td class="num">'+(r.sum.people>0?expCell(r.sum.perGrain, stdGrain(r.g)):'—')+'</td>'+
+          '<td class="num">'+(r.sum.people>0?(isOverWarn(r.g, r.sum.perCapita)?'<span class="cmp-up">¥'+money(r.sum.perCapita)+' ⚠️</span>':'¥'+money(r.sum.perCapita)):'—')+'</td><td class="num" style="font-weight:600">'+(r.sum.people>0?'¥'+money(r.pred):'—')+'</td>'+
           '<td class="num">'+(r.tDiff==null?'—':fmtDiff(r.tDiff,''))+'</td><td class="num">'+(r.pDiff==null?'—':fmtDiff(r.pDiff,''))+'</td></tr>';
       }).join('')+'</tbody></table>';
   }
@@ -1063,7 +1126,7 @@ function openDayModal(date, group){
     kpiCard('🥬','食材/调味/粮油','¥'+money(sum.food)+' / ¥'+money(sum.cond)+' / ¥'+money(sum.grain),'','kic-r')+'</div>';
   html += '<div class="tbl-wrap" style="margin-bottom:14px"><table class="tbl"><thead><tr><th>指标</th><th class="num">就餐人次</th><th class="num">食材费用</th><th class="num">调味料</th><th class="num">粮油</th><th class="num">当日合计</th></tr></thead><tbody>'+
     '<tr><td>金额(元)</td><td class="num">'+sum.people+'</td><td class="num">¥'+money(sum.food)+'</td><td class="num">¥'+money(sum.cond)+'</td><td class="num">¥'+money(sum.grain)+'</td><td class="num" style="font-weight:700">¥'+money(sum.total)+'</td></tr>'+
-    '<tr><td>实际人均(元)</td><td class="num">—</td><td class="num">¥'+money(sum.perFood)+'</td><td class="num">¥'+money(sum.perCond)+'</td><td class="num">¥'+money(sum.perGrain)+'</td><td class="num" style="font-weight:700">¥'+money(sum.perCapita)+'</td></tr>'+
+    '<tr><td>实际人均(元)</td><td class="num">—</td><td class="num">'+pcText(sum.perFood, sum.people)+'</td><td class="num">'+pcText(sum.perCond, sum.people)+'</td><td class="num">'+pcText(sum.perGrain, sum.people)+'</td><td class="num" style="font-weight:700">'+pcText(sum.perCapita, sum.people)+'</td></tr>'+
     '<tr><td>预测人均(元)</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num" style="font-weight:700">¥'+money(predAll)+'</td></tr>'+
     '</tbody></table><div class="hint">预测人均 = 实际食材人均 + 预计调味料 + 预计粮油；预计标准按人员分组设置，见下方各分组。</div></div>';
   if(!grouped.length){ html += '<div class="empty-state"><div class="big">📭</div>当日暂无记录</div>'; }
@@ -1073,7 +1136,7 @@ function openDayModal(date, group){
     html += '<div style="display:flex;align-items:center;gap:10px;margin:10px 0 4px;flex-wrap:wrap">'+
       '<span class="tag tag-grp">'+esc(rec.group)+'</span>'+
       '<span style="font-size:13px;color:var(--muted)">'+rec.people+' 人次</span>'+
-      '<span style="font-size:13px;font-weight:600">实际人均 ¥'+money(gSum.perCapita)+'</span>'+
+      '<span style="font-size:13px;font-weight:600">实际人均 ¥'+money(gSum.perCapita)+'</span>'+(isOverWarn(rec.group, gSum.perCapita)?'<span class="tag" style="background:var(--danger-light);color:var(--danger);font-weight:600">⚠️ 超预警</span>':'')+
       '<span style="font-size:13px;color:var(--muted)">预测人均 ¥'+money(gPred)+'</span>'+
       '<span style="font-size:13px;color:var(--muted)">'+esc(rec.note||'')+'</span>'+
       '<span style="margin-left:auto;font-weight:700;color:var(--primary-dark)">¥'+money(itemsAmount(rec.items))+'</span>'+
@@ -1168,7 +1231,56 @@ function renderReport(){
   }).sort(function(a,b){ return b.value-a.value; }).slice(0,10);
   if(top.length){ barChart('report-top', top.map(function(t){ return {label:t.label, value:t.value}; }), {color:'#f59e0b'}); }
   else { $('report-top').innerHTML='<div class="empty-state"><div class="big">📭</div>本月暂无数据</div>'; }
+  renderMonthlyBoard();
 }
+
+function renderMonthlyBoard(){
+  var y = current.reportY, m = current.reportM;
+  var group = $('report-group').value||'全部';
+  var labels=[], act=[], pred=[], rows=[];
+  var overCount=0, dataDays=0, avgDays=0, sumAct=0, sumPred=0;
+  var daysInMonth = monthDays(y,m);
+  for(var d=1; d<=daysInMonth; d++){
+    var ds = y+'-'+pad2(m)+'-'+pad2(d);
+    var sum = daySummary(ds, group);
+    if(sum.total<=0 && sum.people<=0) continue;
+    var gp = dayPredict(ds, group);
+    var hasPeople = sum.people>0;
+    dataDays++;
+    labels.push(String(d));
+    act.push(hasPeople ? sum.perCapita : 0);
+    pred.push(hasPeople ? gp : 0);
+    if(hasPeople){ avgDays++; sumAct += sum.perCapita; sumPred += gp; }
+    var over = false;
+    if(hasPeople){
+      if(group==='全部'){
+        over = sum.recs.some(function(r){ return isOverWarn(r.group, daySummary(ds, r.group).perCapita); });
+      } else {
+        over = isOverWarn(group, sum.perCapita);
+      }
+    }
+    if(over) overCount++;
+    rows.push({ds:ds, people:sum.people, act:hasPeople?sum.perCapita:null, pred:hasPeople?gp:null, over:over});
+  }
+  $('report-board-kpis').innerHTML =
+    kpiCard('📅','有数据天数', String(dataDays),'','kic-b')+
+    kpiCard('🧮','平均实际人均','¥'+money(avgDays?sumAct/avgDays:0),'','kic-g')+
+    kpiCard('🎯','平均预测人均','¥'+money(avgDays?sumPred/avgDays:0),'','kic-a')+
+    kpiCard('⚠️','超预警天数', String(overCount),'','kic-r');
+  if(!rows.length){
+    $('report-board-chart').innerHTML = '<div class="empty-state"><div class="big">📭</div>该月份暂无数据</div>';
+    $('report-board-table').innerHTML = '';
+    return;
+  }
+  dualLineChart('report-board-chart', labels, act, pred, {colorA:'#2563eb', colorB:'#f59e0b', nameA:'实际人均', nameB:'预测人均'});
+  $('report-board-table').innerHTML = '<table class="tbl"><thead><tr><th>日期</th><th class="num">就餐人次</th><th class="num">实际人均(元)</th><th class="num">预测人均(元)</th><th class="num">差额(实际-预测)</th><th class="center">预警</th></tr></thead><tbody>'+
+    rows.map(function(r){
+      var diff = (r.act!=null && r.pred!=null) ? r2(r.act - r.pred) : null;
+      var wk = r.over ? '<span class="tag" style="background:var(--danger-light);color:var(--danger);font-weight:600">⚠️ 超预警</span>' : '<span class="tag tag-empty">正常</span>';
+      return '<tr><td>'+r.ds+'</td><td class="num">'+r.people+'</td><td class="num" style="font-weight:600">'+(r.act!=null?'¥'+money(r.act):'—')+'</td><td class="num">'+(r.pred!=null?'¥'+money(r.pred):'—')+'</td><td class="num">'+(diff!=null?fmtDiff(diff,''):'—')+'</td><td class="center">'+wk+'</td></tr>';
+    }).join('')+'</tbody></table>';
+}
+
 /* ================= 食材库 ================= */
 var ingFilter = { q:'', cat:'' };
 var ingEditId = null;
@@ -1238,12 +1350,13 @@ function renderSettings(){
   $('group-chips').innerHTML = state.groups.map(function(g){
     return '<span class="group-chip">'+esc(g)+'<span class="rm" onclick="removeGroup(\''+esc(g)+'\')">✕</span></span>';
   }).join('') + (state.groups.length? '' : '<span style="color:var(--muted)">暂无分组</span>');
-  var html = '<div class="tbl-wrap" style="max-width:620px;margin-bottom:12px"><table class="tbl"><thead><tr><th>人员分组</th><th class="num">预计人均调味料(元/人·天)</th><th class="num">预计人均粮油(元/人·天)</th></tr></thead><tbody>';
+  var html = '<div class="tbl-wrap" style="max-width:760px;margin-bottom:12px"><table class="tbl"><thead><tr><th>人员分组</th><th class="num">预计人均调味料(元/人·天)</th><th class="num">预计人均粮油(元/人·天)</th><th class="num">人均预警线(元/人·天)</th></tr></thead><tbody>';
   state.groups.forEach(function(g){
     var st = stdFor(g);
     html += '<tr><td style="font-weight:600">'+esc(g)+'</td>'+
-      '<td class="num"><input type="number" class="std-cond" data-g="'+esc(g)+'" min="0" step="0.01" style="width:110px;text-align:right" value="'+st.cond+'"></td>'+
-      '<td class="num"><input type="number" class="std-grain" data-g="'+esc(g)+'" min="0" step="0.01" style="width:110px;text-align:right" value="'+st.grain+'"></td></tr>';
+      '<td class="num"><input type="number" class="std-cond" data-g="'+esc(g)+'" min="0" step="0.01" style="width:104px;text-align:right" value="'+st.cond+'"></td>'+
+      '<td class="num"><input type="number" class="std-grain" data-g="'+esc(g)+'" min="0" step="0.01" style="width:104px;text-align:right" value="'+st.grain+'"></td>'+
+      '<td class="num"><input type="number" class="std-warn" data-g="'+esc(g)+'" min="0" step="0.5" style="width:104px;text-align:right" value="'+st.warn+'"></td></tr>';
   });
   html += '</tbody></table></div>';
   $('standards-list').innerHTML = html;
@@ -1254,8 +1367,9 @@ function saveExpect(){
   state.groups.forEach(function(g){
     var c = Number(document.querySelector('.std-cond[data-g="'+esc(g)+'"]').value);
     var gr = Number(document.querySelector('.std-grain[data-g="'+esc(g)+'"]').value);
-    if(!isFinite(c) || c<0 || !isFinite(gr) || gr<0){ ok = false; return; }
-    st[g] = { cond:c, grain:gr };
+    var w = Number(document.querySelector('.std-warn[data-g="'+esc(g)+'"]').value);
+    if(!isFinite(c) || c<0 || !isFinite(gr) || gr<0 || !isFinite(w) || w<0){ ok = false; return; }
+    st[g] = { cond:c, grain:gr, warn:w };
   });
   if(!ok){ toast('预计标准格式不正确，请填写非负数','err'); return; }
   state.settings = state.settings||defaultSettings();
