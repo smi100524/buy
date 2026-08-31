@@ -1428,10 +1428,22 @@ function renderMonthlyBoard(){
     if(over) overCount++;
     rows.push({ds:ds, people:sum.people, act:hasPeople?sum.perCapita:null, pred:hasPeople?gp:null, over:over});
   }
+  var msAll = monthSummary(y,m,'全部');
+  var msZ = monthSummary(y,m,'职员');
+  var msY = monthSummary(y,m,'员工');
+  var foodAll = r2(msAll.total - msAll.cond - msAll.grain);
+  var foodZ = r2(msZ.total - msZ.cond - msZ.grain);
+  var foodY = r2(msY.total - msY.cond - msY.grain);
+  var predZ = monthPredict(y,m,'职员');
+  var predY = monthPredict(y,m,'员工');
   $('report-board-kpis').innerHTML =
-    kpiCard('📅','有数据天数', String(dataDays),'','kic-b')+
-    kpiCard('🧮','平均实际人均','¥'+money(avgDays?sumAct/avgDays:0),'','kic-g')+
-    kpiCard('🎯','平均预测人均','¥'+money(avgDays?sumPred/avgDays:0),'','kic-a')+
+    kpiCard('💴','总食材费用','¥'+money(foodAll),'','kic-g')+
+    kpiCard('👔','职员食材费用','¥'+money(foodZ),'','kic-b')+
+    kpiCard('🧑','员工食材费用','¥'+money(foodY),'','kic-a')+
+    kpiCard('🎯','职员预计人均','¥'+money(predZ),'','kic-b')+
+    kpiCard('🧮','职员实际人均','¥'+money(msZ.perCapita),'','kic-g')+
+    kpiCard('🎯','员工预计人均','¥'+money(predY),'','kic-a')+
+    kpiCard('🧮','员工实际人均','¥'+money(msY.perCapita),'','kic-r')+
     kpiCard('⚠️','超预警天数', String(overCount),'','kic-r');
   if(!rows.length){
     $('report-board-chart').innerHTML = '<div class="empty-state"><div class="big">📭</div>该月份暂无数据</div>';
