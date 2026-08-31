@@ -273,12 +273,17 @@ body{font-size:16px}
 #entry-sheet .item-row.sheet:not(.head).sel{background:#dcecff;box-shadow:inset 3px 0 0 #2563eb}
 #entry-sheet .item-row.sheet:not(.head).sel .auto-cell{background:#dcecff}
 
-/* 单位/单价：食材库有→只读显示；没有→可编辑 */
-#entry-sheet .item-row.sheet .f-unit-d[readonly],
-#entry-sheet .item-row.sheet .f-price-d[readonly]{background:#f3f7f4;border:none;border-radius:0;text-align:center;color:#374151;cursor:default;box-shadow:none}
-#entry-sheet .item-row.sheet .f-unit-d:not([readonly]),
-#entry-sheet .item-row.sheet .f-price-d:not([readonly]){background:#fff;border:1px solid #d5dfd9;border-radius:4px;text-align:right}
 #entry-sheet .item-row.sheet .ops{display:flex;gap:2px;align-items:center;justify-content:center}
+
+/* ============ 每日采购表：全部居中 + 字号统一 + 排版优化 ============ */
+#entry-sheet .item-row.sheet > *{font-size:15px;text-align:center}
+#entry-sheet .item-row.sheet input{font-size:15px;padding:9px 6px;text-align:center}
+#entry-sheet .item-row.sheet input::placeholder{text-align:center;color:#9aa5a0}
+#entry-sheet .item-row.sheet .auto-cell{padding:10px 4px;font-size:15px}
+#entry-sheet .item-row.sheet .amt{padding:10px 4px;font-size:15px;font-weight:600;text-align:center}
+#entry-sheet .item-row.sheet.head > *{font-size:15px;font-weight:600;text-align:center}
+#entry-sheet .item-row.sheet .ops{font-size:17px;gap:4px}
+#entry-sheet .item-row.sheet .seq{font-weight:600}
 
 </style>
 </head>
