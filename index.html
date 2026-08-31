@@ -304,8 +304,7 @@ body{font-size:16px}
     <nav class="nav" id="main-nav">
       <button data-page="dashboard" class="active"><span class="ic">📊</span>工作台</button>
       <button data-page="entry"><span class="ic">🛒</span>每日采购表</button>
-      <button data-page="ledger"><span class="ic">📅</span>采购台账</button>
-      <button data-page="report"><span class="ic">📈</span>统计报表</button>
+      <button data-page="board"><span class="ic">📊</span>月度看板</button>
       <button data-page="ingredients"><span class="ic">🥬</span>食材库</button>
       <button data-page="settings"><span class="ic">⚙️</span>系统设置</button>
     </nav>
@@ -353,56 +352,22 @@ body{font-size:16px}
   </section>
 
   <!-- 采购台账 -->
-  <section id="page-ledger" class="page">
-    <div class="page-title">采购台账</div>
-    <div class="page-sub">按月份查看每日采购汇总，点击日期查看当日明细；环比为本日与上一日的对比。</div>
-    <div class="card">
-      <div class="range-bar">
-        <div class="field"><label>年份</label><select id="ledger-year"></select></div>
-        <div class="field"><label>月份</label><select id="ledger-month"></select></div>
-        <div class="field"><label>人员</label><select id="ledger-group"><option value="全部">全部</option></select></div>
-        <button class="btn btn-ghost" id="ledger-prev">◀ 上月</button>
-        <button class="btn btn-ghost" id="ledger-next">下月 ▶</button>
-        <button class="btn btn-outline" id="btn-export-month">导出本月 Excel</button>
-      </div>
-      <div class="kpis" style="margin-top:14px;margin-bottom:0" id="ledger-kpis"></div>
-      <div class="cal-head"><div>周一</div><div>周二</div><div>周三</div><div>周四</div><div>周五</div><div>周六</div><div>周日</div></div>
-      <div class="cal-grid" id="ledger-calendar"></div>
-    </div>
-    <div class="card">
-      <h3><span class="bar"></span>每日汇总表</h3>
-      <div class="tbl-wrap" id="ledger-table"></div>
-    </div>
-  </section>
-
-  <!-- 统计报表 -->
-  <section id="page-report" class="page">
-    <div class="page-title">统计报表</div>
-    <div class="page-sub">按月份/人员维度分析采购金额、类别构成与趋势。</div>
+    <!-- 月度看板 -->
+  <section id="page-board" class="page">
+    <div class="page-title">月度看板</div>
+    <div class="page-sub">每月核心指标与每日预计/实际对比，一目了然。</div>
     <div class="card">
       <div class="range-bar">
         <div class="field"><label>年份</label><select id="report-year"></select></div>
         <div class="field"><label>月份</label><select id="report-month"></select></div>
         <div class="field"><label>人员</label><select id="report-group"><option value="全部">全部</option></select></div>
+        <button class="btn btn-outline" id="btn-export-month">导出本月 Excel</button>
         <button class="btn btn-outline" id="btn-export-all">导出全部 Excel</button>
       </div>
-      <div class="kpis" style="margin-top:14px;margin-bottom:0" id="report-kpis"></div>
-    </div>
-    <div class="grid2">
-      <div class="card"><h3><span class="bar"></span>类别采购金额占比</h3><div class="chart-box" id="report-cat"></div></div>
-      <div class="card"><h3><span class="bar"></span>本月每日采购金额</h3><div class="chart-box" id="report-daily"></div></div>
-    </div>
-    <div class="card"><h3><span class="bar"></span>近 12 个月采购金额趋势</h3><div class="chart-box" id="report-trend"></div></div>
-    <div class="card">
-      <h3><span class="bar"></span>月度看板 · 每日预实对比</h3>
-      <div class="kpis" id="report-board-kpis" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:12px"></div>
+      <div class="kpis" id="report-board-kpis" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:14px 0 12px"></div>
       <div class="chart-box" id="report-board-chart"></div>
       <div class="tbl-wrap" id="report-board-table" style="margin-top:12px"></div>
       <div class="hint" style="margin-top:8px">实际人均超过预警线（职员 12 元 / 员工 6 元，可在系统设置调整）的天数会标记 ⚠️ 超预警。</div>
-    </div>
-    <div class="grid2">
-      <div class="card"><h3><span class="bar"></span>本月 vs 上月 类别对比</h3><div class="chart-box" id="report-compare"></div></div>
-      <div class="card"><h3><span class="bar"></span>采购金额 Top 10 食材</h3><div class="chart-box" id="report-top"></div></div>
     </div>
   </section>
 
@@ -747,8 +712,7 @@ function switchPage(name){
   current.page = name;
   if(name==='dashboard') renderDashboard();
   else if(name==='entry') renderEntry();
-  else if(name==='ledger') renderLedger();
-  else if(name==='report') renderReport();
+  else if(name==='board') renderMonthlyBoard();
   else if(name==='ingredients') renderIngredients();
   else if(name==='settings') renderSettings();
   window.scrollTo(0,0);
@@ -850,10 +814,10 @@ function kpiCard(ic,label,val,detail,cls){
 function goLatestMonth(){
   var ldm = latestDataMonth();
   if(!ldm) return;
-  current.ledgerY = ldm.y; current.ledgerM = ldm.m;
-  switchPage('ledger');
+  current.reportY = ldm.y; current.reportM = ldm.m;
+  switchPage('board');
   fillYearMonths();
-  renderLedger();
+  renderMonthlyBoard();
 }
 
 /* ---------- 模态 ---------- */
@@ -920,7 +884,7 @@ function renderDashboard(){
       notice = '<div class="card" style="background:var(--accent-light);border-color:#f3d9a8;display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">'+
         '<span style="font-size:20px">📌</span>'+
         '<div style="flex:1">当前月份（'+y+'年'+m+'月）暂无采购记录。最近有数据的月份为 <b>'+ldm0.y+'年'+ldm0.m+'月</b>（采购 ¥'+money(lm0.total)+'，'+lm0.people+' 人次）。</div>'+
-        '<button class="btn btn-outline btn-sm" onclick="goLatestMonth()">查看 '+ldm0.y+'年'+ldm0.m+'月 台账</button></div>';
+        '<button class="btn btn-outline btn-sm" onclick="goLatestMonth()">查看 '+ldm0.y+'年'+ldm0.m+'月 月度看板</button></div>';
     }
   }
   $('dash-notice').innerHTML = notice;
@@ -1557,8 +1521,7 @@ function saveExpect(){
   state.settings.standards = st;
   saveState();
   renderSettings();
-  if(current.page==='ledger') renderLedger();
-  if(current.page==='report') renderReport();
+  if(current.page==='board') renderMonthlyBoard();
   if(current.page==='dashboard') renderDashboard();
   toast('每日人均标准已保存');
 }
@@ -1589,8 +1552,8 @@ function exportXlsxAll(){
   toast('Excel 已导出');
 }
 function exportMonthXlsx(){
-  var y=current.ledgerY, m=current.ledgerM;
-  var group = $('ledger-group').value||'全部';
+  var y=current.reportY, m=current.reportM;
+  var group = $('report-group').value||'全部';
   var sheets = buildMonthSheet(y,m,group);
   var buf = buildXlsx(sheets);
   downloadBlob(buf, '食堂采购台账_'+y+'年'+m+'月.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -1650,7 +1613,7 @@ function rebuildDatalists(){
   $('dl-units').innerHTML = Object.keys(units).map(function(u){ return '<option value="'+esc(u)+'">'+esc(u)+'</option>'; }).join('');
 }
 function rebuildGroupSelects(){
-  ['ledger-group','report-group'].forEach(function(id){
+  ['report-group'].forEach(function(id){
     var sel = $(id);
     var prev = sel.value;
     var opts = '<option value="全部">全部</option>';
@@ -2293,16 +2256,16 @@ function autoSyncOnSave(){ if(syncSettings().token) uploadToServer(true); }
 /* ================= 初始化与事件绑定 ================= */
 function fillYearMonths(){
   var yNow = new Date().getFullYear();
-  var ySelL = $('ledger-year'), ySelR = $('report-year');
+  var ySel = $('report-year');
   var html='';
   for(var y=2020;y<=yNow+2;y++) html += '<option value="'+y+'">'+y+' 年</option>';
-  ySelL.innerHTML = html; ySelR.innerHTML = html;
-  ySelL.value = current.ledgerY; ySelR.value = current.reportY;
-  var mSelL = $('ledger-month'), mSelR = $('report-month');
+  ySel.innerHTML = html;
+  ySel.value = current.reportY;
+  var mSel = $('report-month');
   var mhtml='';
   for(var m=1;m<=12;m++) mhtml += '<option value="'+m+'">'+m+' 月</option>';
-  mSelL.innerHTML = mhtml; mSelR.innerHTML = mhtml;
-  mSelL.value = current.ledgerM; mSelR.value = current.reportM;
+  mSel.innerHTML = mhtml;
+  mSel.value = current.reportM;
 }
 function fillIngCatSelect(){
   var cats = Object.keys(CATEGORY_COLORS);
@@ -2321,21 +2284,9 @@ function bindEvents(){
   $('btn-next-day').addEventListener('click', function(){ var d=new Date(current.entryDate+'T00:00:00'); d.setDate(d.getDate()+1); current.entryDate = d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); renderEntry(); });
   $('btn-copy-tpl').addEventListener('click', copyTemplate);
 
-  $('ledger-year').addEventListener('change', function(){ current.ledgerY = Number($('ledger-year').value); renderLedger(); });
-  $('ledger-month').addEventListener('change', function(){ current.ledgerM = Number($('ledger-month').value); renderLedger(); });
-  $('ledger-group').addEventListener('change', renderLedger);
-  $('ledger-prev').addEventListener('click', function(){
-    current.ledgerM--; if(current.ledgerM<1){ current.ledgerM=12; current.ledgerY--; }
-    fillYearMonths(); renderLedger();
-  });
-  $('ledger-next').addEventListener('click', function(){
-    current.ledgerM++; if(current.ledgerM>12){ current.ledgerM=1; current.ledgerY++; }
-    fillYearMonths(); renderLedger();
-  });
-
-  $('report-year').addEventListener('change', function(){ current.reportY = Number($('report-year').value); renderReport(); });
-  $('report-month').addEventListener('change', function(){ current.reportM = Number($('report-month').value); renderReport(); });
-  $('report-group').addEventListener('change', renderReport);
+  $('report-year').addEventListener('change', function(){ current.reportY = Number($('report-year').value); renderMonthlyBoard(); });
+  $('report-month').addEventListener('change', function(){ current.reportM = Number($('report-month').value); renderMonthlyBoard(); });
+  $('report-group').addEventListener('change', renderMonthlyBoard);
 
   $('btn-export-all').addEventListener('click', exportXlsxAll);
   $('btn-export-month').addEventListener('click', exportMonthXlsx);
@@ -2383,7 +2334,7 @@ function latestDataMonth(){
 }
 function init(){
   var ldm = latestDataMonth();
-  if(ldm){ current.ledgerY = ldm.y; current.ledgerM = ldm.m; current.reportY = ldm.y; current.reportM = ldm.m; }
+  if(ldm){ current.reportY = ldm.y; current.reportM = ldm.m; }
   $('header-date').textContent = new Date().getFullYear()+' 年 '+(new Date().getMonth()+1)+' 月 '+new Date().getDate()+' 日';
   fillYearMonths();
   fillIngCatSelect();
