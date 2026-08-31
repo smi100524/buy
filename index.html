@@ -458,17 +458,14 @@ body{font-size:16px}
       <div class="hint">默认密码 <b>123456</b>，上线后请尽快修改。点顶栏「🔒」可立即锁屏；<span style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="forgetRemember()">清除本机免密记忆</span>。</div>
     </div>
     <div class="card">
-      <h3><span class="bar"></span>云同步（线上 GitHub，多台电脑共用）</h3>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
-        <div class="field" style="flex:1;min-width:280px"><label>GitHub 访问令牌（每台电脑填一次，保存在本机）</label><input type="password" id="sync-token" placeholder="ghp_..."></div>
-        <button class="btn btn-outline" id="btn-sync-save">保存令牌</button>
-      </div>
+      <h3><span class="bar"></span>云同步（多台电脑共用数据）</h3>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end" id="sync-config"></div>
       <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn btn-primary" id="btn-sync-down">⬇️ 从线上下载数据</button>
-        <button class="btn btn-outline" id="btn-sync-up">⬆️ 上传数据到线上</button>
+        <button class="btn btn-primary" id="btn-sync-down">⬇️ 同步数据（下载）</button>
+        <button class="btn btn-outline" id="btn-sync-up">⬆️ 上传数据</button>
       </div>
       <div class="hint" id="sync-status"></div>
-      <div class="hint">数据保存在您的 GitHub 仓库 <b>smi100524/buy</b> 的 <b>data.json</b>（HTTPS 加密、永久保存）。令牌获取：GitHub 头像 → Settings → Developer settings → Personal access tokens → Tokens (classic) → 勾选 <b>repo</b> → 生成。保存后自动上传、打开时自动下载。</div>
+      <div class="hint" id="sync-help"></div>
     </div>
     <div class="card">
       <h3><span class="bar"></span>数据备份与恢复</h3>
@@ -1557,8 +1554,22 @@ function renderSettings(){
     return '<span class="group-chip">'+esc(g)+'<span class="rm" onclick="removeGroup(\''+esc(g)+'\')">✕</span></span>';
   }).join('') + (state.groups.length? '' : '<span style="color:var(--muted)">暂无分组</span>');
   var ssync = syncSettings();
-  var stk = document.getElementById('sync-token'); if(stk) stk.value = ssync.token;
+  var cfg = document.getElementById('sync-config');
+  if(cfg){
+    if(syncMode()==='server'){
+      cfg.innerHTML = '<div style="flex:1;min-width:280px;padding:10px 12px;background:var(--primary-light);border:1px solid var(--primary-border);border-radius:8px;color:var(--primary-dark)">当前为「局域网服务器」模式：本页由服务器 ('+location.origin+') 提供，自动同步，无需任何配置。</div>';
+    } else {
+      cfg.innerHTML = '<div class="field" style="flex:1;min-width:280px"><label>GitHub 访问令牌（每台电脑填一次，保存在本机）</label><input type="password" id="sync-token" placeholder="ghp_..."></div><button class="btn btn-outline" id="btn-sync-save">保存令牌</button>';
+      var stk = document.getElementById('sync-token'); if(stk) stk.value = ssync.token;
+    }
+  }
   updateSyncStatus();
+  var help = document.getElementById('sync-help');
+  if(help){
+    help.textContent = syncMode()==='server'
+      ? '服务器每天 0 点还会自动同步就餐人数看板的实际人数。各电脑只需打开 ' + location.origin + ' 即可自动同步，无需令牌。'
+      : '线上模式：数据保存在 GitHub 仓库 smi100524/buy 的 data.json。令牌获取：GitHub 头像 → Settings → Developer settings → Personal access tokens → Tokens (classic) → 勾选 repo → 生成。每台电脑填一次并保存。';
+  }
   var html = '<div class="tbl-wrap" style="max-width:760px;margin-bottom:12px"><table class="tbl"><thead><tr><th>人员分组</th><th class="num">预计人均调味料(元/人·天)</th><th class="num">预计人均粮油(元/人·天)</th><th class="num">人均预警线(元/人·天)</th></tr></thead><tbody>';
   state.groups.forEach(function(g){
     var st = stdFor(g);
@@ -2316,10 +2327,19 @@ function autoDiningOnLoad(){
   }).catch(function(){});
 }
 
-/* ============ 云同步（线上 GitHub 存储，多台电脑共用） ============ */
+/* ============ 云同步（局域网服务器 / 线上 GitHub 两种模式，自动判断） ============ */
 var SYNC_REPO = 'smi100524/buy';
 var SYNC_BRANCH = 'main';
 var SYNC_FILE = 'data.json';
+
+function syncMode(){
+  // 由公司局域网服务器提供（http 同源）→ 服务器模式；GitHub https 或本地文件 → GitHub 模式
+  if(/^https:/.test(location.protocol) && location.hostname.indexOf('github.io') >= 0) return 'github';
+  if(/^file:/.test(location.protocol)) return 'github';
+  return 'server';
+}
+function serverKey(){ return '123456'; }
+
 function syncSettings(){
   var s = (state.settings && state.settings.sync) || {};
   return { token: s.token || '', lastUp: s.lastUp || '', lastDown: s.lastDown || '' };
@@ -2336,9 +2356,9 @@ function syncFetch(url, opts){
   opts = opts || {};
   var ctrl = new AbortController();
   var timer = setTimeout(function(){ ctrl.abort(); }, 20000);
-  var headers = Object.assign({ 'Accept':'application/vnd.github+json' }, opts.headers || {});
+  var headers = Object.assign({ 'Accept':'application/vnd.github+json', 'X-Sync-Key': serverKey() }, opts.headers || {});
   var tok = syncSettings().token;
-  if(tok && url.indexOf('api.github.com') >= 0) headers['Authorization'] = 'token ' + tok;
+  if(syncMode()==='github' && tok && url.indexOf('api.github.com') >= 0) headers['Authorization'] = 'token ' + tok;
   return fetch(url, Object.assign({ signal: ctrl.signal }, opts, { headers: headers })).then(function(r){
     clearTimeout(timer);
     return r;
@@ -2347,32 +2367,54 @@ function syncFetch(url, opts){
 function updateSyncStatus(){
   var el = document.getElementById('sync-status');
   if(!el) return;
-  var tok = syncSettings().token;
   var ss = syncSettings();
   var parts = [];
   if(ss.lastUp) parts.push('上次上传 ' + new Date(ss.lastUp).toLocaleString());
   if(ss.lastDown) parts.push('上次下载 ' + new Date(ss.lastDown).toLocaleString());
-  el.textContent = tok
-    ? '已配置令牌。数据保存于 GitHub 仓库 '+SYNC_REPO+' 的 '+SYNC_FILE+'（HTTPS 加密、永久保存）。保存后自动上传，打开时自动下载。' + (parts.length?(' ｜ '+parts.join('，')):'')
-    : '未配置令牌：请在下方粘贴 GitHub 访问令牌并保存（每台电脑填一次即可）。【重要】每台电脑都必须填令牌并点保存，否则录入的数据只在本机、其他电脑看不到！';
+  if(syncMode()==='server'){
+    el.textContent = '当前为「局域网服务器」模式（' + location.origin + '）：打开本网址即自动同步，无需令牌。保存后自动上传、打开时自动下载。' + (parts.length?(' ｜ '+parts.join('，')):'');
+    return;
+  }
+  el.textContent = '当前为「线上 GitHub」模式。' + (ss.token
+    ? '已配置令牌，数据保存于 GitHub 仓库 '+SYNC_REPO+' 的 '+SYNC_FILE+'。' + (parts.length?(' ｜ '+parts.join('，')):'')
+    : '未配置令牌：请粘贴 GitHub 访问令牌并保存（每台电脑填一次）。【重要】每台电脑都必须填令牌并保存，否则录入的数据只在本机、其他电脑看不到！');
+}
+function applyDownloadedState(d, quiet){
+  var ss = syncSettings();
+  state = d.state;
+  state.settings = state.settings || {};
+  state.settings.sync = { token: ss.token, lastUp: ss.lastUp, lastDown: new Date().toISOString() };
+  saveState();
+  rebuildDatalists(); rebuildGroupSelects();
+  var ts = d.updatedAt ? new Date(d.updatedAt) : null;
+  if(!quiet) toast('已同步数据'+(ts?('（更新于 '+ts.toLocaleString()+'）'):''));
+  updateSyncStatus();
 }
 function downloadFromServer(quiet){
-  var url = 'https://raw.githubusercontent.com/'+SYNC_REPO+'/'+SYNC_BRANCH+'/'+SYNC_FILE;
+  var url;
+  if(syncMode()==='server'){
+    url = location.origin + '/api/data';
+    return fetch(url, { cache:'no-store' }).then(function(r){
+      if(r.status===404){ if(!quiet) toast('服务器暂无数据，请先在某台电脑「上传数据到线上/服务器」一次','err'); return false; }
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.json();
+    }).then(function(d){
+      if(!d || !d.state){ if(!quiet) toast('服务器数据格式异常','err'); return false; }
+      applyDownloadedState(d, quiet);
+      return true;
+    }).catch(function(e){
+      if(!quiet) toast('下载失败：'+e.message,'err');
+      return false;
+    });
+  }
+  url = 'https://raw.githubusercontent.com/'+SYNC_REPO+'/'+SYNC_BRANCH+'/'+SYNC_FILE;
   return fetch(url, { cache:'no-store' }).then(function(r){
-    if(r.status === 404){ if(!quiet) toast('线上暂无数据，请先在「上传数据到线上」上传一次','err'); return false; }
+    if(r.status===404){ if(!quiet) toast('线上暂无数据，请先在「上传数据到线上」上传一次','err'); return false; }
     if(!r.ok) throw new Error('HTTP '+r.status);
     return r.json();
   }).then(function(d){
     if(!d || !d.state){ if(!quiet) toast('线上数据格式异常','err'); return false; }
-    var ss = syncSettings();
-    state = d.state;
-    state.settings = state.settings || {};
-    state.settings.sync = { token: ss.token, lastUp: ss.lastUp, lastDown: new Date().toISOString() };
-    saveState();
-    rebuildDatalists(); rebuildGroupSelects();
-    var ts = d.updatedAt ? new Date(d.updatedAt) : null;
-    if(!quiet) toast('已从线上下载数据'+(ts?('（线上更新于 '+ts.toLocaleString()+'）'):''));
-    updateSyncStatus();
+    applyDownloadedState(d, quiet);
     return true;
   }).catch(function(e){
     if(!quiet) toast('下载失败：'+e.message,'err');
@@ -2380,6 +2422,24 @@ function downloadFromServer(quiet){
   });
 }
 function uploadToServer(quiet){
+  if(syncMode()==='server'){
+    var payload = { state: state, updatedAt: new Date().toISOString() };
+    return syncFetch(location.origin + '/api/data', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload) })
+      .then(function(r){
+        if(!r.ok) throw new Error('HTTP '+r.status+'（密钥不正确或服务器拒绝）');
+        return r.json();
+      }).then(function(d){
+        var ss = syncSettings();
+        state.settings.sync = { token: ss.token, lastUp: new Date().toISOString(), lastDown: ss.lastDown };
+        saveState();
+        if(!quiet) toast('已上传到服务器（其他电脑同步后即可看到）');
+        updateSyncStatus();
+        return true;
+      }).catch(function(e){
+        if(!quiet) toast('上传失败：'+e.message+'（请确认服务器已启动；数据还在本机，可稍后重试）','err');
+        return false;
+      });
+  }
   var tok = syncSettings().token;
   if(!tok){ if(!quiet) toast('请先在云同步设置里填写 GitHub 访问令牌','err'); return Promise.resolve(false); }
   var payload = { state: state, updatedAt: new Date().toISOString() };
@@ -2417,8 +2477,14 @@ function uploadToServer(quiet){
     return false;
   });
 }
-function autoSyncOnLoad(){ if(syncSettings().token) downloadFromServer(true); }
-function autoSyncOnSave(){ if(syncSettings().token) uploadToServer(false); }
+function autoSyncOnLoad(){
+  if(syncMode()==='server'){ downloadFromServer(true); return; }
+  if(syncSettings().token) downloadFromServer(true);
+}
+function autoSyncOnSave(){
+  if(syncMode()==='server'){ uploadToServer(false); return; }
+  if(syncSettings().token) uploadToServer(false);
+}
 /* ================= 初始化与事件绑定 ================= */
 function fillYearMonths(){
   var yNow = new Date().getFullYear();
@@ -2470,7 +2536,8 @@ function bindEvents(){
   $('btn-add-group').addEventListener('click', addGroup);
   $('new-group').addEventListener('keydown', function(e){ if(e.key==='Enter') addGroup(); });
   $('btn-save-expect').addEventListener('click', saveExpect);
-  $('btn-sync-save').addEventListener('click', function(){
+  var bSave = document.getElementById('btn-sync-save');
+  if(bSave) bSave.addEventListener('click', function(){
     setSyncSettings(document.getElementById('sync-token').value.trim());
     updateSyncStatus();
     toast('云同步令牌已保存（本机记住，之后自动同步）');
