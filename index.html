@@ -187,7 +187,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px;background:#fff}
 .cmp-sub{font-size:10.5px;color:var(--muted);font-weight:400}
 
 /* 原表格式的明细表 */
-.item-row.sheet{grid-template-columns:40px minmax(60px,0.4fr) 96px 56px 100px 82px 92px 106px minmax(90px,1fr) 76px}
+.item-row.sheet{grid-template-columns:40px minmax(60px,0.4fr) 96px 56px 100px 82px 92px 106px minmax(80px,0.85fr) 76px}
 .item-row.sheet .auto-cell{background:#f3f7f4;color:#374151;font-size:12.5px;text-align:center;padding:6px 4px;border-radius:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .item-row.sheet .amt{font-weight:700;color:var(--primary-dark);text-align:right;padding:0 4px;font-size:13px}
 
@@ -231,7 +231,7 @@ body{font-size:16px}
 .item-row{gap:8px;padding:9px 11px}
 .item-row input,.item-row select{padding:9px 10px;font-size:15px;border-radius:8px}
 .item-row.sheet .auto-cell{font-size:14px;padding:10px 4px}
-.item-row.sheet{grid-template-columns:44px minmax(60px,0.4fr) 96px 58px 104px 84px 94px 106px minmax(90px,1fr) 76px}
+.item-row.sheet{grid-template-columns:44px minmax(60px,0.4fr) 96px 58px 104px 84px 94px 106px minmax(80px,0.85fr) 76px}
 .item-row.head{font-size:14.5px}
 .cal-day{min-height:92px;padding:8px 9px}
 .cal-day .dnum{font-size:14.5px}
@@ -284,6 +284,10 @@ body{font-size:16px}
 #entry-sheet .item-row.sheet.head > *{font-size:15px;font-weight:600;text-align:center}
 #entry-sheet .item-row.sheet .ops{font-size:17px;gap:4px}
 #entry-sheet .item-row.sheet .seq{font-weight:600}
+
+#entry-sheet .item-row.sheet .ops .ins{border:2px solid #9aa9b8;background:#fff;border-radius:7px;width:34px;height:32px;display:inline-flex;align-items:center;justify-content:center;font-size:17px;padding:0}
+#entry-sheet .item-row.sheet .ops .ins:hover{background:#eaf6ff;border-color:#2563eb}
+#entry-sheet .item-row.sheet .ops .del{width:34px;height:32px;display:inline-flex;align-items:center;justify-content:center;padding:0}
 
 </style>
 </head>
