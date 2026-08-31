@@ -444,6 +444,19 @@ body{font-size:16px}
       <div class="hint">默认密码 <b>123456</b>，上线后请尽快修改。点顶栏「🔒」可立即锁屏；<span style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="forgetRemember()">清除本机免密记忆</span>。</div>
     </div>
     <div class="card">
+      <h3><span class="bar"></span>云同步（线上 GitHub，多台电脑共用）</h3>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+        <div class="field" style="flex:1;min-width:280px"><label>GitHub 访问令牌（每台电脑填一次，保存在本机）</label><input type="password" id="sync-token" placeholder="ghp_..."></div>
+        <button class="btn btn-outline" id="btn-sync-save">保存令牌</button>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" id="btn-sync-down">⬇️ 从线上下载数据</button>
+        <button class="btn btn-outline" id="btn-sync-up">⬆️ 上传数据到线上</button>
+      </div>
+      <div class="hint" id="sync-status"></div>
+      <div class="hint">数据保存在您的 GitHub 仓库 <b>smi100524/buy</b> 的 <b>data.json</b>（HTTPS 加密、永久保存）。令牌获取：GitHub 头像 → Settings → Developer settings → Personal access tokens → Tokens (classic) → 勾选 <b>repo</b> → 生成。保存后自动上传、打开时自动下载。</div>
+    </div>
+    <div class="card">
       <h3><span class="bar"></span>数据备份与恢复</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn btn-primary" id="btn-export-xlsx">📄 导出 Excel（完整数据）</button>
@@ -1144,6 +1157,7 @@ function saveGroupEntry(){
   var items = collectItems();
   if(!items.length){ toast(g+'：请至少填写一行食材','err'); return; }
   if(people<=0){ toast(g+'：请填写就餐人数','err'); return; }
+  if(!confirm('确定保存 '+date+' '+g+' 的采购记录吗？\n共 '+items.length+' 项食材，合计 \u00a5'+money(itemsAmount(items)))){ return; }
   var rec = getRecord(date, g);
   var note = document.querySelector('#entry-sheet .g-note').value.trim();
   if(rec){
@@ -1152,6 +1166,7 @@ function saveGroupEntry(){
     state.records.push({ id:uid('r'), date:date, group:g, people:people, note:note, items:items });
   }
   saveState();
+  autoSyncOnSave();
   renderEntry();
   toast('已保存 '+date+' '+g+'（¥'+money(itemsAmount(items))+'）');
 }
@@ -1507,6 +1522,9 @@ function renderSettings(){
   $('group-chips').innerHTML = state.groups.map(function(g){
     return '<span class="group-chip">'+esc(g)+'<span class="rm" onclick="removeGroup(\''+esc(g)+'\')">✕</span></span>';
   }).join('') + (state.groups.length? '' : '<span style="color:var(--muted)">暂无分组</span>');
+  var ssync = syncSettings();
+  var stk = document.getElementById('sync-token'); if(stk) stk.value = ssync.token;
+  updateSyncStatus();
   var html = '<div class="tbl-wrap" style="max-width:760px;margin-bottom:12px"><table class="tbl"><thead><tr><th>人员分组</th><th class="num">预计人均调味料(元/人·天)</th><th class="num">预计人均粮油(元/人·天)</th><th class="num">人均预警线(元/人·天)</th></tr></thead><tbody>';
   state.groups.forEach(function(g){
     var st = stdFor(g);
@@ -2173,6 +2191,99 @@ async function importPriceTable(file){
     toast('导入失败：'+e.message,'err');
   }
 }
+/* ============ 云同步（线上 GitHub 存储，多台电脑共用） ============ */
+var SYNC_REPO = 'smi100524/buy';
+var SYNC_BRANCH = 'main';
+var SYNC_FILE = 'data.json';
+function syncSettings(){
+  var s = (state.settings && state.settings.sync) || {};
+  return { token: s.token || '' };
+}
+function setSyncSettings(token){
+  state.settings = state.settings || defaultSettings();
+  state.settings.sync = { token: token || '' };
+  saveState();
+}
+function b64EncodeUnicode(str){ return btoa(unescape(encodeURIComponent(str))); }
+function b64DecodeUnicode(str){ return decodeURIComponent(escape(atob(str))); }
+function syncFetch(url, opts){
+  opts = opts || {};
+  var ctrl = new AbortController();
+  var timer = setTimeout(function(){ ctrl.abort(); }, 20000);
+  var headers = Object.assign({ 'Accept':'application/vnd.github+json' }, opts.headers || {});
+  var tok = syncSettings().token;
+  if(tok && url.indexOf('api.github.com') >= 0) headers['Authorization'] = 'token ' + tok;
+  return fetch(url, Object.assign({ signal: ctrl.signal }, opts, { headers: headers })).then(function(r){
+    clearTimeout(timer);
+    return r;
+  }, function(e){ clearTimeout(timer); throw e; });
+}
+function updateSyncStatus(){
+  var el = document.getElementById('sync-status');
+  if(!el) return;
+  var tok = syncSettings().token;
+  el.textContent = tok
+    ? '已配置令牌。数据保存于 GitHub 仓库 '+SYNC_REPO+' 的 '+SYNC_FILE+'（HTTPS 加密、永久保存）。保存后自动上传，打开时自动下载。'
+    : '未配置令牌：请在下方粘贴 GitHub 访问令牌并保存（每台电脑填一次即可，之后自动免密同步）。';
+}
+function downloadFromServer(quiet){
+  var url = 'https://raw.githubusercontent.com/'+SYNC_REPO+'/'+SYNC_BRANCH+'/'+SYNC_FILE;
+  return fetch(url, { cache:'no-store' }).then(function(r){
+    if(r.status === 404){ if(!quiet) toast('线上暂无数据，请先在「上传数据到线上」上传一次','err'); return false; }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.json();
+  }).then(function(d){
+    if(!d || !d.state){ if(!quiet) toast('线上数据格式异常','err'); return false; }
+    var ss = syncSettings();
+    state = d.state;
+    state.settings = state.settings || {};
+    state.settings.sync = ss;
+    saveState();
+    rebuildDatalists(); rebuildGroupSelects();
+    var ts = d.updatedAt ? new Date(d.updatedAt) : null;
+    if(!quiet) toast('已从线上下载数据'+(ts?('（更新于 '+ts.toLocaleString()+'）'):''));
+    return true;
+  }).catch(function(e){
+    if(!quiet) toast('下载失败：'+e.message,'err');
+    return false;
+  });
+}
+function uploadToServer(quiet){
+  var tok = syncSettings().token;
+  if(!tok){ if(!quiet) toast('请先在云同步设置里填写 GitHub 访问令牌','err'); return Promise.resolve(false); }
+  var payload = { state: state, updatedAt: new Date().toISOString() };
+  var content = b64EncodeUnicode(JSON.stringify(payload));
+  var api = 'https://api.github.com/repos/'+SYNC_REPO+'/contents/'+SYNC_FILE;
+  function doPut(sha){
+    var body = { message: '食堂采购数据同步', content: content };
+    if(sha) body.sha = sha;
+    return syncFetch(api, { method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body) }).then(function(r){
+      if(r.status === 409) return 'retry';
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.json();
+    });
+  }
+  return syncFetch(api, { method:'GET' }).then(function(r){
+    if(r.status === 404) return null;
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.json();
+  }).then(function(meta){
+    return doPut(meta ? meta.sha : null);
+  }).then(function(res){
+    if(res === 'retry'){
+      return syncFetch(api, { method:'GET' }).then(function(r2){ return r2.json(); }).then(function(m2){ return doPut(m2.sha); });
+    }
+    return res;
+  }).then(function(){
+    if(!quiet) toast('已上传到线上');
+    return true;
+  }).catch(function(e){
+    if(!quiet) toast('上传失败：'+e.message+'（请确认令牌有效且有仓库权限）','err');
+    return false;
+  });
+}
+function autoSyncOnLoad(){ if(syncSettings().token) downloadFromServer(true); }
+function autoSyncOnSave(){ if(syncSettings().token) uploadToServer(true); }
 /* ================= 初始化与事件绑定 ================= */
 function fillYearMonths(){
   var yNow = new Date().getFullYear();
@@ -2237,6 +2348,13 @@ function bindEvents(){
   $('btn-add-group').addEventListener('click', addGroup);
   $('new-group').addEventListener('keydown', function(e){ if(e.key==='Enter') addGroup(); });
   $('btn-save-expect').addEventListener('click', saveExpect);
+  $('btn-sync-save').addEventListener('click', function(){
+    setSyncSettings(document.getElementById('sync-token').value.trim());
+    updateSyncStatus();
+    toast('云同步令牌已保存（本机记住，之后自动同步）');
+  });
+  $('btn-sync-down').addEventListener('click', function(){ downloadFromServer(false); });
+  $('btn-sync-up').addEventListener('click', function(){ uploadToServer(false); });
   $('btn-login').addEventListener('click', doLogin);
   $('login-pw').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
   $('btn-lock').addEventListener('click', lockApp);
@@ -2268,6 +2386,7 @@ function init(){
   bindEvents();
   renderDashboard();
   checkLogin();
+  autoSyncOnLoad();
 }
 init();
 </script>
