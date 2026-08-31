@@ -365,12 +365,20 @@ body{font-size:16px}
       <div class="range-bar">
         <div class="field"><label>年份</label><select id="report-year"></select></div>
         <div class="field"><label>月份</label><select id="report-month"></select></div>
-        <div class="field"><label>人员</label><select id="report-group"><option value="全部">全部</option></select></div>
         <button class="btn btn-outline" id="btn-export-month">导出本月 Excel</button>
         <button class="btn btn-outline" id="btn-export-all">导出全部 Excel</button>
       </div>
       <div class="kpis" id="report-board-kpis" style="grid-template-columns:repeat(auto-fit,minmax(215px,1fr));margin:14px 0 12px"></div>
-      <div class="chart-box" id="report-board-chart"></div>
+      <div class="grid2" style="margin-top:8px">
+        <div>
+          <div style="font-size:15px;font-weight:600;margin-bottom:6px">👔 职员 · 每日预实对比</div>
+          <div class="chart-box" id="report-board-chart-z"></div>
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:600;margin-bottom:6px">🧑 员工 · 每日预实对比</div>
+          <div class="chart-box" id="report-board-chart-y"></div>
+        </div>
+      </div>
       <div class="tbl-wrap" id="report-board-table" style="margin-top:12px"></div>
       <div class="hint" style="margin-top:8px">实际人均超过预警线（职员 12 元 / 员工 6 元，可在系统设置调整）的天数会标记 ⚠️ 超预警。</div>
     </div>
@@ -1372,32 +1380,7 @@ function renderReport(){
 
 function renderMonthlyBoard(){
   var y = current.reportY, m = current.reportM;
-  var group = $('report-group').value||'全部';
-  var labels=[], act=[], pred=[], rows=[];
-  var overCount=0, dataDays=0, avgDays=0, sumAct=0, sumPred=0;
   var daysInMonth = monthDays(y,m);
-  for(var d=1; d<=daysInMonth; d++){
-    var ds = y+'-'+pad2(m)+'-'+pad2(d);
-    var sum = daySummary(ds, group);
-    if(sum.total<=0 && sum.people<=0) continue;
-    var gp = dayPredict(ds, group);
-    var hasPeople = sum.people>0;
-    dataDays++;
-    labels.push(String(d));
-    act.push(hasPeople ? sum.perCapita : 0);
-    pred.push(hasPeople ? gp : 0);
-    if(hasPeople){ avgDays++; sumAct += sum.perCapita; sumPred += gp; }
-    var over = false;
-    if(hasPeople){
-      if(group==='全部'){
-        over = sum.recs.some(function(r){ return isOverWarn(r.group, daySummary(ds, r.group).perCapita); });
-      } else {
-        over = isOverWarn(group, sum.perCapita);
-      }
-    }
-    if(over) overCount++;
-    rows.push({ds:ds, people:sum.people, act:hasPeople?sum.perCapita:null, pred:hasPeople?gp:null, over:over});
-  }
   var msAll = monthSummary(y,m,'全部');
   var msZ = monthSummary(y,m,'职员');
   var msY = monthSummary(y,m,'员工');
@@ -1406,6 +1389,38 @@ function renderMonthlyBoard(){
   var foodY = r2(msY.total - msY.cond - msY.grain);
   var predZ = monthPredict(y,m,'职员');
   var predY = monthPredict(y,m,'员工');
+  var overZ = 0, overY = 0;
+
+  // 收集每日数据（职员/员工分开）
+  var labels=[], actZ=[], predZArr=[], actY=[], predYArr=[], rows=[];
+  var dayIdx = {};
+  for(var d=1; d<=daysInMonth; d++){
+    var ds = y+'-'+pad2(m)+'-'+pad2(d);
+    var sz = daySummary(ds,'职员');
+    var sy = daySummary(ds,'员工');
+    var has = (sz.total>0||sz.people>0) || (sy.total>0||sy.people>0);
+    if(!has) continue;
+    var li = labels.length;
+    dayIdx[ds] = li;
+    labels.push(String(d));
+    var pz = sz.people>0 ? dayPredict(ds,'职员') : 0;
+    var py2 = sy.people>0 ? dayPredict(ds,'员工') : 0;
+    actZ.push(sz.people>0 ? sz.perCapita : 0);
+    predZArr.push(sz.people>0 ? pz : 0);
+    actY.push(sy.people>0 ? sy.perCapita : 0);
+    predYArr.push(sy.people>0 ? py2 : 0);
+    var overZDay = sz.people>0 && isOverWarn('职员', sz.perCapita);
+    var overYDay = sy.people>0 && isOverWarn('员工', sy.perCapita);
+    if(overZDay) overZ++;
+    if(overYDay) overY++;
+    if(sz.total>0 || sz.people>0){
+      rows.push({ds:ds, g:'职员', people:sz.people, act:sz.people>0?sz.perCapita:null, pred:sz.people>0?pz:null, over:overZDay});
+    }
+    if(sy.total>0 || sy.people>0){
+      rows.push({ds:ds, g:'员工', people:sy.people, act:sy.people>0?sy.perCapita:null, pred:sy.people>0?py2:null, over:overYDay});
+    }
+  }
+
   $('report-board-kpis').innerHTML =
     kpiCard('💴','总食材费用', moneyC(foodAll),'','kic-g')+
     kpiCard('👔','职员食材费用', moneyC(foodZ),'','kic-b')+
@@ -1414,18 +1429,22 @@ function renderMonthlyBoard(){
     kpiCard('🧮','职员实际人均', moneyC(msZ.perCapita),'','kic-g')+
     kpiCard('🎯','员工预计人均', moneyC(predY),'','kic-a')+
     kpiCard('🧮','员工实际人均', moneyC(msY.perCapita),'','kic-r')+
-    kpiCard('⚠️','超预警天数', String(overCount),'','kic-r');
-  if(!rows.length){
-    $('report-board-chart').innerHTML = '<div class="empty-state"><div class="big">📭</div>该月份暂无数据</div>';
+    kpiCard('⚠️','职员超预警天数', String(overZ)+' 天','','kic-r')+
+    kpiCard('⚠️','员工超预警天数', String(overY)+' 天','','kic-r');
+
+  if(!labels.length){
+    $('report-board-chart-z').innerHTML = '<div class="empty-state">该月份暂无数据</div>';
+    $('report-board-chart-y').innerHTML = '<div class="empty-state">该月份暂无数据</div>';
     $('report-board-table').innerHTML = '';
     return;
   }
-  dualLineChart('report-board-chart', labels, act, pred, {colorA:'#2563eb', colorB:'#f59e0b', nameA:'实际人均', nameB:'预测人均'});
-  $('report-board-table').innerHTML = '<table class="tbl"><thead><tr><th>日期</th><th class="num">就餐人次</th><th class="num">实际人均(元)</th><th class="num">预测人均(元)</th><th class="num">差额(实际-预测)</th><th class="center">预警</th></tr></thead><tbody>'+
+  dualLineChart('report-board-chart-z', labels, actZ, predZArr, {colorA:'#2563eb', colorB:'#f59e0b', nameA:'实际人均', nameB:'预测人均'});
+  dualLineChart('report-board-chart-y', labels, actY, predYArr, {colorA:'#2563eb', colorB:'#f59e0b', nameA:'实际人均', nameB:'预测人均'});
+  $('report-board-table').innerHTML = '<table class="tbl"><thead><tr><th>日期</th><th>人员</th><th class="num">就餐人次</th><th class="num">实际人均(元)</th><th class="num">预测人均(元)</th><th class="num">差额(实际-预测)</th><th class="center">预警</th></tr></thead><tbody>'+
     rows.map(function(r){
       var diff = (r.act!=null && r.pred!=null) ? r2(r.act - r.pred) : null;
       var wk = r.over ? '<span class="tag" style="background:var(--danger-light);color:var(--danger);font-weight:600">⚠️ 超预警</span>' : '<span class="tag tag-empty">正常</span>';
-      return '<tr><td>'+r.ds+'</td><td class="num">'+r.people+'</td><td class="num" style="font-weight:600">'+(r.act!=null?'¥'+money(r.act):'—')+'</td><td class="num">'+(r.pred!=null?'¥'+money(r.pred):'—')+'</td><td class="num">'+(diff!=null?fmtDiff(diff,''):'—')+'</td><td class="center">'+wk+'</td></tr>';
+      return '<tr><td>'+r.ds+'</td><td><span class="tag tag-grp">'+esc(r.g)+'</span></td><td class="num">'+r.people+'</td><td class="num" style="font-weight:600">'+(r.act!=null?'¥'+money(r.act):'—')+'</td><td class="num">'+(r.pred!=null?'¥'+money(r.pred):'—')+'</td><td class="num">'+(diff!=null?fmtDiff(diff,''):'—')+'</td><td class="center">'+wk+'</td></tr>';
     }).join('')+'</tbody></table>';
 }
 
@@ -1621,6 +1640,7 @@ function rebuildDatalists(){
 function rebuildGroupSelects(){
   ['report-group'].forEach(function(id){
     var sel = $(id);
+    if(!sel) return;
     var prev = sel.value;
     var opts = '<option value="全部">全部</option>';
     state.groups.forEach(function(g){ opts += '<option value="'+esc(g)+'">'+esc(g)+'</option>'; });
@@ -2292,7 +2312,6 @@ function bindEvents(){
 
   $('report-year').addEventListener('change', function(){ current.reportY = Number($('report-year').value); renderMonthlyBoard(); });
   $('report-month').addEventListener('change', function(){ current.reportM = Number($('report-month').value); renderMonthlyBoard(); });
-  $('report-group').addEventListener('change', renderMonthlyBoard);
 
   $('btn-export-all').addEventListener('click', exportXlsxAll);
   $('btn-export-month').addEventListener('click', exportMonthXlsx);
