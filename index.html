@@ -202,6 +202,61 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px;background:#fff}
 .warn-banner{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;padding:9px 14px;border-radius:9px;font-size:13.5px;margin-bottom:12px}
 .cal-day.warn{border-color:#f87171;background:#fef2f2}
 
+/* ============ 适老化：大按钮、大字体、清晰易用 ============ */
+body{font-size:16px}
+.app-header{padding:14px 22px}
+.brand .t1{font-size:22px}
+.brand .t2{font-size:13px}
+.nav{gap:6px}
+.nav button{padding:12px 18px;font-size:16px;border-radius:11px}
+.nav .ic{font-size:18px}
+.btn{padding:12px 22px;font-size:16px;border-radius:10px;gap:8px}
+.btn-sm{padding:9px 16px;font-size:15px;border-radius:9px}
+.btn-icon{padding:9px 12px;font-size:18px;border-radius:8px}
+.btn-lock{font-size:19px;padding:10px 14px}
+.field label{font-size:14px}
+.field input,.field select,.field textarea{padding:11px 13px;font-size:16px;border-radius:9px}
+.range-bar .field input,.range-bar .field select{padding:9px 12px}
+.page-title{font-size:24px}
+.page-sub{font-size:15px}
+.kpi{padding:20px 22px;gap:16px}
+.kpi .ic{width:56px;height:56px;font-size:27px;border-radius:14px}
+.kpi .v{font-size:27px}
+.kpi .l{font-size:14px}
+.kpi .d{font-size:13.5px}
+.tbl th{font-size:15px;padding:11px 14px}
+.tbl td{font-size:15px;padding:10px 13px}
+.tbl-wrap{border-radius:11px}
+.tag{font-size:13.5px;padding:4px 12px;border-radius:999px}
+.item-row{gap:8px;padding:9px 11px}
+.item-row input,.item-row select{padding:9px 10px;font-size:15px;border-radius:8px}
+.item-row.sheet .auto-cell{font-size:14px;padding:10px 4px}
+.item-row.sheet{grid-template-columns:44px 88px minmax(130px,2.2fr) 96px 106px 58px 68px 84px 94px 134px 42px}
+.item-row.head{font-size:14.5px}
+.cal-day{min-height:92px;padding:8px 9px}
+.cal-day .dnum{font-size:14.5px}
+.cal-day .dsum{font-size:14px}
+.cal-day .dpeo{font-size:12.5px}
+.cal-head div{font-size:13px}
+.modal-head h3{font-size:18px}
+.modal-head{padding:18px 22px}
+.modal-body{padding:20px 22px}
+.modal-foot{padding:14px 22px}
+.group-chip{font-size:15px;padding:6px 14px}
+.warn-banner{font-size:15px;padding:12px 16px}
+.entry-summary .s-item .s-v{font-size:24px}
+#login-mask .login-card{padding:34px}
+#login-mask h3{font-size:22px}
+#login-mask .login-card input{padding:14px;font-size:17px}
+#btn-login{padding:14px;font-size:17px}
+#login-mask .login-card label{font-size:14px}
+.toast{font-size:15px;padding:12px 18px}
+.settings-group .field input{padding:10px 12px;font-size:15px}
+
+/* 适老化：覆盖页面级更具体规则 */
+#page-entry .item-row input,#page-entry .item-row select{padding:10px 11px;font-size:16px}
+#entry-sheet .item-row input,#entry-sheet .item-row select{padding:10px 11px;font-size:16px}
+
 </style>
 </head>
 <body>
@@ -677,8 +732,8 @@ function donutChart(containerId, data){
   }).join('');
   el.innerHTML = '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:240px;display:block;margin:0 auto">'+
     parts+
-    '<text x="'+CX+'" y="'+(CY-2)+'" text-anchor="middle" font-size="26" font-weight="700" fill="#1f2937">¥'+money(total)+'</text>'+
-    '<text x="'+CX+'" y="'+(CY+18)+'" text-anchor="middle" font-size="11" fill="#6b7280">合计金额</text></svg>'+
+    '<text x="'+CX+'" y="'+(CY-2)+'" text-anchor="middle" font-size="28" font-weight="700" fill="#1f2937">¥'+money(total)+'</text>'+
+    '<text x="'+CX+'" y="'+(CY+18)+'" text-anchor="middle" font-size="13" fill="#6b7280">合计金额</text></svg>'+
     '<div class="chart-legend">'+legend+'</div>';
 }
 
@@ -694,15 +749,15 @@ function barChart(containerId, data, opts){
   for(var i=0;i<=4;i++){
     var y = PT+(H-PT-PB)*(i/4);
     grid += '<line x1="'+PL+'" y1="'+y.toFixed(1)+'" x2="'+(W-PR)+'" y2="'+y.toFixed(1)+'" stroke="#eef1ef"/>';
-    grid += '<text x="'+(PL-6)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="10" fill="#9ca3af">'+(maxV*(4-i)/4).toFixed(0)+'</text>';
+    grid += '<text x="'+(PL-6)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="12" fill="#9ca3af">'+(maxV*(4-i)/4).toFixed(0)+'</text>';
   }
   data.forEach(function(d,i){
     var h = (H-PT-PB)*(d.value/maxV);
     var x = PL+i*cw+(cw-bw)/2;
     var y = H-PB-h;
     bars += '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw+'" height="'+h.toFixed(1)+'" rx="3" fill="'+(d.color||opts.color||'#1f8a5b')+'" opacity="0.9"/>';
-    bars += '<text x="'+(x+bw/2).toFixed(1)+'" y="'+(y-5).toFixed(1)+'" text-anchor="middle" font-size="10" fill="#374151">'+(d.value>0?money(d.value):'')+'</text>';
-    labels += '<text x="'+(x+bw/2).toFixed(1)+'" y="'+(H-PB+16)+'" text-anchor="middle" font-size="10.5" fill="#6b7280">'+esc(String(d.label))+'</text>';
+    bars += '<text x="'+(x+bw/2).toFixed(1)+'" y="'+(y-5).toFixed(1)+'" text-anchor="middle" font-size="12" fill="#374151">'+(d.value>0?money(d.value):'')+'</text>';
+    labels += '<text x="'+(x+bw/2).toFixed(1)+'" y="'+(H-PB+16)+'" text-anchor="middle" font-size="12.5" fill="#6b7280">'+esc(String(d.label))+'</text>';
   });
   el.innerHTML = '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%">'+grid+bars+labels+'</svg>';
 }
@@ -719,7 +774,7 @@ function lineChart(containerId, data, opts){
   for(var i=0;i<=4;i++){
     var y = PT+(H-PT-PB)*(i/4);
     grid += '<line x1="'+PL+'" y1="'+y.toFixed(1)+'" x2="'+(W-PR)+'" y2="'+y.toFixed(1)+'" stroke="#eef1ef"/>';
-    grid += '<text x="'+(PL-6)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="10" fill="#9ca3af">'+(maxV*(4-i)/4).toFixed(0)+'</text>';
+    grid += '<text x="'+(PL-6)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="12" fill="#9ca3af">'+(maxV*(4-i)/4).toFixed(0)+'</text>';
   }
   var coords = data.map(function(d,i){
     var x = n>1 ? PL+i*stepX : PL+(W-PL-PR)/2;
@@ -733,8 +788,8 @@ function lineChart(containerId, data, opts){
   }
   coords.forEach(function(c,i){
     pts += '<circle cx="'+c.x.toFixed(1)+'" cy="'+c.y.toFixed(1)+'" r="3.4" fill="#fff" stroke="'+(opts.color||'#1f8a5b')+'" stroke-width="2.2"/>';
-    pts += '<text x="'+c.x.toFixed(1)+'" y="'+(c.y-8).toFixed(1)+'" text-anchor="middle" font-size="10" fill="#374151">'+(data[i].value>0?money(data[i].value):'')+'</text>';
-    labels += '<text x="'+c.x.toFixed(1)+'" y="'+(H-PB+16)+'" text-anchor="middle" font-size="10.5" fill="#6b7280">'+esc(String(data[i].label))+'</text>';
+    pts += '<text x="'+c.x.toFixed(1)+'" y="'+(c.y-8).toFixed(1)+'" text-anchor="middle" font-size="12" fill="#374151">'+(data[i].value>0?money(data[i].value):'')+'</text>';
+    labels += '<text x="'+c.x.toFixed(1)+'" y="'+(H-PB+16)+'" text-anchor="middle" font-size="12.5" fill="#6b7280">'+esc(String(data[i].label))+'</text>';
   });
   el.innerHTML = '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%">'+grid+pts+labels+'</svg>';
 }
@@ -767,7 +822,7 @@ function dualLineChart(containerId, labels, a, b, opts){
   for(var i=0;i<=4;i++){
     var y = PT+(H-PT-PB)*(i/4);
     grid += '<line x1="'+PL+'" y1="'+y.toFixed(1)+'" x2="'+(W-PR)+'" y2="'+y.toFixed(1)+'" stroke="#eef1ef"/>';
-    grid += '<text x="'+(PL-6)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="10" fill="#9ca3af">'+(maxV*(4-i)/4).toFixed(1)+'</text>';
+    grid += '<text x="'+(PL-6)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="12" fill="#9ca3af">'+(maxV*(4-i)/4).toFixed(1)+'</text>';
   }
   function seriesPath(vals){
     var coords = vals.map(function(v,i){
@@ -787,7 +842,7 @@ function dualLineChart(containerId, labels, a, b, opts){
   for(var j=0;j<n;j++){
     pts += '<circle cx="'+pa.coords[j].x.toFixed(1)+'" cy="'+pa.coords[j].y.toFixed(1)+'" r="3" fill="#fff" stroke="'+(opts.colorA||'#2563eb')+'" stroke-width="2"/>';
     pts += '<circle cx="'+pb.coords[j].x.toFixed(1)+'" cy="'+pb.coords[j].y.toFixed(1)+'" r="3" fill="#fff" stroke="'+(opts.colorB||'#f59e0b')+'" stroke-width="2"/>';
-    labelsXml += '<text x="'+pa.coords[j].x.toFixed(1)+'" y="'+(H-PB+16)+'" text-anchor="middle" font-size="10" fill="#6b7280">'+esc(String(labels[j]))+'</text>';
+    labelsXml += '<text x="'+pa.coords[j].x.toFixed(1)+'" y="'+(H-PB+16)+'" text-anchor="middle" font-size="12" fill="#6b7280">'+esc(String(labels[j]))+'</text>';
   }
   el.innerHTML = '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%">'+grid+pts+labelsXml+'</svg>'+
     '<div class="chart-legend"><span class="lg-item"><span class="dot" style="background:'+(opts.colorA||'#2563eb')+'"></span>'+(opts.nameA||'实际')+'</span>'+
