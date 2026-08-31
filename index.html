@@ -38,7 +38,7 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--text)}
 .nav .ic{font-size:15px}
 
 /* 布局 */
-main{max-width:1200px;margin:0 auto;padding:20px}
+main{max-width:none;margin:0 auto;padding:14px 18px}
 .page{display:none}
 .page.active{display:block;animation:fadeIn .18s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -165,7 +165,14 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px;background:#fff}
 .empty-state{text-align:center;color:var(--muted);padding:36px 16px;font-size:13.5px}
 .empty-state .big{font-size:34px;margin-bottom:8px}
 
+/* 每日采购表全屏表格 */
+#page-entry .card{padding:12px 14px}
+#page-entry .page-title{font-size:22px}
+#entry-sheet .card{padding:14px 16px}
+#entry-sheet .item-row input,#entry-sheet .item-row select{padding:7px 8px;font-size:14px}
+#entry-sheet .items-wrap{border-radius:8px}
 /* 打印 */
+
 @media print{
   .app-header,.nav,.no-print{display:none!important}
   body{background:#fff}
@@ -180,7 +187,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px;background:#fff}
 .cmp-sub{font-size:10.5px;color:var(--muted);font-weight:400}
 
 /* 原表格式的明细表 */
-.item-row.sheet{grid-template-columns:40px 80px minmax(128px,2.1fr) 94px 104px 56px 66px 80px 90px 118px 48px 36px}
+.item-row.sheet{grid-template-columns:40px 80px minmax(128px,2.2fr) 96px 106px 56px 66px 82px 92px 130px 36px}
 .item-row.sheet .auto-cell{background:#f3f7f4;color:#374151;font-size:12.5px;text-align:center;padding:6px 4px;border-radius:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .item-row.sheet .amt{font-weight:700;color:var(--primary-dark);text-align:right;padding:0 4px;font-size:13px}
 
@@ -902,7 +909,7 @@ function renderEntrySheet(){
     '<button class="btn btn-danger g-del"'+(rec?'':' disabled style="opacity:.5"')+'>删除记录</button>'+
     '<button class="btn btn-outline g-export">📄 导出当日表</button>'+
     '<button class="btn btn-outline g-export-all">📄 导出全部人员</button></div>';
-  html += '<div class="items-wrap"><div class="item-row sheet head"><span>序号</span><span>日期</span><span>食材名称</span><span>类别</span><span>规格/型号</span><span>单位</span><span>数量</span><span>单价</span><span>金额</span><span>备注</span><span>人数</span><span>操作</span></div><div class="g-items"></div></div>';
+  html += '<div class="items-wrap"><div class="item-row sheet head"><span>序号</span><span>日期</span><span>食材名称</span><span>类别</span><span>规格/型号</span><span>单位</span><span>数量</span><span>单价</span><span>金额</span><span>备注</span><span>操作</span></div><div class="g-items"></div></div>';
   html += '<div style="margin-top:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn btn-ghost btn-sm g-add">＋ 添加一行</button><div style="font-size:13.5px;font-weight:700;color:var(--primary-dark)"><span class="g-total"></span></div></div>';
   html += '</div>';
   sheet.innerHTML = html;
@@ -917,12 +924,8 @@ function renderEntrySheet(){
   sheet.querySelector('.g-del').addEventListener('click', function(){ deleteGroupEntry(); });
   sheet.querySelector('.g-export').addEventListener('click', exportDailyXlsx);
   sheet.querySelector('.g-export-all').addEventListener('click', exportDailyAllXlsx);
-  sheet.querySelector('.g-people').addEventListener('input', function(){ updateGroupTotal(); syncPeopleCol(); });
+  sheet.querySelector('.g-people').addEventListener('input', updateGroupTotal);
   updateGroupTotal();
-}
-function syncPeopleCol(){
-  var v = document.querySelector('#entry-sheet .g-people').value;
-  document.querySelector('#entry-sheet').querySelectorAll('.g-items .ppl').forEach(function(el){ el.textContent = v; });
 }
 function addItemRow(container, data, idx, date, people){
   data = data||{};
@@ -940,7 +943,6 @@ function addItemRow(container, data, idx, date, people){
     '<input class="f-price" type="number" min="0" step="any" value="'+(data.price!=null?data.price:'')+'" placeholder="单价">'+
     '<div class="amt">¥'+money(amt)+'</div>'+
     '<input class="f-note" value="'+esc(data.note||'')+'" placeholder="备注">'+
-    '<span class="auto-cell ppl">'+(people||'')+'</span>'+
     '<button class="btn-icon del" title="删除此行">🗑️</button>';
   container.appendChild(row);
   bindItemRow(row, container);
@@ -1811,17 +1813,17 @@ function buildDailySheet(date, group){
   rows.push([{v:title, s:4}, C6, C6, C6, C6, C6, C6, C6, C6, C6, C6]);
   rows.push([
     {v:'序号', s:5}, {v:'日期', s:5}, {v:'食材名称', s:5}, {v:'类别', s:5}, {v:'规格/型号', s:5},
-    {v:'单位', s:5}, {v:'数量', s:5}, {v:'单价', s:5}, {v:'单项金额', s:5}, {v:'备注', s:5}, {v:'人数', s:5}
+    {v:'单位', s:5}, {v:'数量', s:5}, {v:'单价', s:5}, {v:'单项金额', s:5}, {v:'备注', s:5}
   ]);
   var items = rec ? rec.items : [];
   items.forEach(function(it, i){
     rows.push([
       {v:i+1, s:6}, {v:dLabel, s:6}, {v:it.name, s:6}, {v:it.category||'', s:6}, {v:it.spec||'', s:6},
       {v:it.unit||'', s:6}, {v:Number(it.qty)||0, s:6}, {v:Number(it.price)||0, s:2}, {v:r2(it.qty*it.price), s:2},
-      {v:it.note||'', s:6}, {v:sum.people, s:6}
+      {v:it.note||'', s:6}
     ]);
   });
-  return [{ name: group, rows: rows, mergeCells:['A1:J1'], colWidths:[15.1,11.3,17.1,16.5,19.1,11.6,10,9.7,11,17.4,11.3] }];
+  return [{ name: group, rows: rows, mergeCells:['A1:I1'], colWidths:[15.1,11.3,17.1,16.5,19.1,11.6,10,9.7,11,17.4] }];
 }
 
 function buildDailyAll(date){
