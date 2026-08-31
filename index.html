@@ -1564,8 +1564,7 @@ function renderSettings(){
     if(syncMode()==='server'){
       cfg.innerHTML = '<div style="flex:1;min-width:280px;padding:10px 12px;background:var(--primary-light);border:1px solid var(--primary-border);border-radius:8px;color:var(--primary-dark)">当前为「局域网服务器」模式：本页由服务器 ('+location.origin+') 提供，自动同步，无需任何配置。</div>';
     } else {
-      cfg.innerHTML = '<div class="field" style="flex:1;min-width:280px"><label>GitHub 访问令牌（每台电脑填一次，保存在本机）</label><input type="password" id="sync-token" placeholder="ghp_..."></div><button class="btn btn-outline" id="btn-sync-save">保存令牌</button>';
-      var stk = document.getElementById('sync-token'); if(stk) stk.value = ssync.token;
+      cfg.innerHTML = '<div style="flex:1;min-width:280px;padding:10px 12px;background:var(--primary-light);border:1px solid var(--primary-border);border-radius:8px;color:var(--primary-dark)">当前为「Supabase 云数据库」模式：数据保存在云端，各电脑打开即自动同步，无需令牌、无需配置。</div>';
     }
   }
   updateSyncStatus();
@@ -1573,7 +1572,7 @@ function renderSettings(){
   if(help){
     help.textContent = syncMode()==='server'
       ? '服务器每天 0 点还会自动同步就餐人数看板的实际人数。各电脑只需打开 ' + location.origin + ' 即可自动同步，无需令牌。'
-      : '线上模式：数据保存在 GitHub 仓库 smi100524/buy 的 data.json。令牌获取：GitHub 头像 → Settings → Developer settings → Personal access tokens → Tokens (classic) → 勾选 repo → 生成。每台电脑填一次并保存。';
+      : '云端模式：数据保存在 Supabase 云数据库（HTTPS、永久保存），各电脑打开即自动同步。保存后自动上传、打开时自动下载，也可点顶部「🔄 同步数据」手动同步。';
   }
   var html = '<div class="tbl-wrap" style="max-width:760px;margin-bottom:12px"><table class="tbl"><thead><tr><th>人员分组</th><th class="num">预计人均调味料(元/人·天)</th><th class="num">预计人均粮油(元/人·天)</th><th class="num">人均预警线(元/人·天)</th></tr></thead><tbody>';
   state.groups.forEach(function(g){
@@ -2332,18 +2331,21 @@ function autoDiningOnLoad(){
   }).catch(function(){});
 }
 
-/* ============ 云同步（局域网服务器 / 线上 GitHub 两种模式，自动判断） ============ */
-var SYNC_REPO = 'smi100524/buy';
-var SYNC_BRANCH = 'main';
-var SYNC_FILE = 'data.json';
+/* ============ 云同步（Supabase 云数据库 / 局域网服务器 自动判断） ============ */
+var SYNC_SUPABASE_URL = 'https://endynazecibflqqgnzoh.supabase.co';
+var SYNC_SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVuZHluYXplY2liZmxxcWduem9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxOTg3NjgsImV4cCI6MjEwMzc3NDc2OH0.lq1a_pWMeTfl3MVcSD30kP6DduMp_nGO0lOK-hujyd0';
 
 function syncMode(){
-  // 由公司局域网服务器提供（http 同源）→ 服务器模式；GitHub https 或本地文件 → GitHub 模式
-  if(/^https:/.test(location.protocol) && location.hostname.indexOf('github.io') >= 0) return 'github';
-  if(/^file:/.test(location.protocol)) return 'github';
-  return 'server';
+  // 由公司局域网服务器提供（http 同源）→ 服务器模式；否则用 Supabase 云数据库
+  if(/^http:/.test(location.protocol) && location.hostname && location.hostname.indexOf('github.io')<0) return 'server';
+  return 'supabase';
 }
 function serverKey(){ return '123456'; }
+function supabaseHeaders(extra){
+  var h = { 'apikey': SYNC_SUPABASE_ANON, 'Authorization': 'Bearer ' + SYNC_SUPABASE_ANON, 'Accept': 'application/json' };
+  if(extra) Object.keys(extra).forEach(function(k){ h[k] = extra[k]; });
+  return h;
+}
 
 function syncSettings(){
   var s = (state.settings && state.settings.sync) || {};
@@ -2355,15 +2357,11 @@ function setSyncSettings(token){
   state.settings.sync = { token: token || '', lastUp: old.lastUp || '', lastDown: old.lastDown || '' };
   saveState();
 }
-function b64EncodeUnicode(str){ return btoa(unescape(encodeURIComponent(str))); }
-function b64DecodeUnicode(str){ return decodeURIComponent(escape(atob(str))); }
 function syncFetch(url, opts){
   opts = opts || {};
   var ctrl = new AbortController();
   var timer = setTimeout(function(){ ctrl.abort(); }, 20000);
-  var headers = Object.assign({ 'Accept':'application/vnd.github+json', 'X-Sync-Key': serverKey() }, opts.headers || {});
-  var tok = syncSettings().token;
-  if(syncMode()==='github' && tok && url.indexOf('api.github.com') >= 0) headers['Authorization'] = 'token ' + tok;
+  var headers = Object.assign(supabaseHeaders(), { 'X-Sync-Key': serverKey() }, opts.headers || {});
   return fetch(url, Object.assign({ signal: ctrl.signal }, opts, { headers: headers })).then(function(r){
     clearTimeout(timer);
     return r;
@@ -2377,49 +2375,45 @@ function updateSyncStatus(){
   if(ss.lastUp) parts.push('上次上传 ' + new Date(ss.lastUp).toLocaleString());
   if(ss.lastDown) parts.push('上次下载 ' + new Date(ss.lastDown).toLocaleString());
   if(syncMode()==='server'){
-    el.textContent = '当前为「局域网服务器」模式（' + location.origin + '）：打开本网址即自动同步，无需令牌。保存后自动上传、打开时自动下载。' + (parts.length?(' ｜ '+parts.join('，')):'');
+    el.textContent = '当前为「局域网服务器」模式（' + location.origin + '）：打开本网址即自动同步，无需配置。保存后自动上传、打开时自动下载。' + (parts.length?(' ｜ '+parts.join('，')):'');
     return;
   }
-  el.textContent = '当前为「线上 GitHub」模式。' + (ss.token
-    ? '已配置令牌，数据保存于 GitHub 仓库 '+SYNC_REPO+' 的 '+SYNC_FILE+'。' + (parts.length?(' ｜ '+parts.join('，')):'')
-    : '未配置令牌：请粘贴 GitHub 访问令牌并保存（每台电脑填一次）。【重要】每台电脑都必须填令牌并保存，否则录入的数据只在本机、其他电脑看不到！');
+  el.textContent = '当前为「Supabase 云数据库」模式：数据保存在您的 Supabase 云端，各电脑打开即自动同步、无需令牌。保存后自动上传、打开时自动下载。' + (parts.length?(' ｜ '+parts.join('，')):'');
 }
-function applyDownloadedState(d, quiet){
+function applyDownloadedState(stateData, updatedAt, quiet){
   var ss = syncSettings();
-  state = d.state;
+  state = stateData;
   state.settings = state.settings || {};
   state.settings.sync = { token: ss.token, lastUp: ss.lastUp, lastDown: new Date().toISOString() };
   saveState();
   rebuildDatalists(); rebuildGroupSelects();
-  var ts = d.updatedAt ? new Date(d.updatedAt) : null;
+  var ts = updatedAt ? new Date(updatedAt) : null;
   if(!quiet) toast('已同步数据'+(ts?('（更新于 '+ts.toLocaleString()+'）'):''));
   updateSyncStatus();
 }
 function downloadFromServer(quiet){
-  var url;
   if(syncMode()==='server'){
-    url = location.origin + '/api/data';
-    return fetch(url, { cache:'no-store' }).then(function(r){
-      if(r.status===404){ if(!quiet) toast('服务器暂无数据，请先在某台电脑「上传数据到线上/服务器」一次','err'); return false; }
+    return fetch(location.origin + '/api/data', { cache:'no-store' }).then(function(r){
+      if(r.status===404){ if(!quiet) toast('服务器暂无数据，请先在某台电脑「上传数据」一次','err'); return false; }
       if(!r.ok) throw new Error('HTTP '+r.status);
       return r.json();
     }).then(function(d){
       if(!d || !d.state){ if(!quiet) toast('服务器数据格式异常','err'); return false; }
-      applyDownloadedState(d, quiet);
+      applyDownloadedState(d.state, d.updatedAt, quiet);
       return true;
     }).catch(function(e){
       if(!quiet) toast('下载失败：'+e.message,'err');
       return false;
     });
   }
-  url = 'https://raw.githubusercontent.com/'+SYNC_REPO+'/'+SYNC_BRANCH+'/'+SYNC_FILE;
-  return fetch(url, { cache:'no-store' }).then(function(r){
-    if(r.status===404){ if(!quiet) toast('线上暂无数据，请先在「上传数据到线上」上传一次','err'); return false; }
+  var url = SYNC_SUPABASE_URL + '/rest/v1/sync_data?select=data,updated_at&id=eq.1';
+  return fetch(url, { headers: supabaseHeaders(), cache:'no-store' }).then(function(r){
     if(!r.ok) throw new Error('HTTP '+r.status);
     return r.json();
-  }).then(function(d){
-    if(!d || !d.state){ if(!quiet) toast('线上数据格式异常','err'); return false; }
-    applyDownloadedState(d, quiet);
+  }).then(function(list){
+    var row = list && list[0];
+    if(!row || !row.data){ if(!quiet) toast('云端暂无数据，请先在「上传数据」上传一次','err'); return false; }
+    applyDownloadedState(row.data, row.updated_at, quiet);
     return true;
   }).catch(function(e){
     if(!quiet) toast('下载失败：'+e.message,'err');
@@ -2427,68 +2421,46 @@ function downloadFromServer(quiet){
   });
 }
 function uploadToServer(quiet){
+  var payload = { state: state, updatedAt: new Date().toISOString() };
   if(syncMode()==='server'){
-    var payload = { state: state, updatedAt: new Date().toISOString() };
     return syncFetch(location.origin + '/api/data', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload) })
       .then(function(r){
         if(!r.ok) throw new Error('HTTP '+r.status+'（密钥不正确或服务器拒绝）');
         return r.json();
-      }).then(function(d){
-        var ss = syncSettings();
-        state.settings.sync = { token: ss.token, lastUp: new Date().toISOString(), lastDown: ss.lastDown };
-        saveState();
-        if(!quiet) toast('已上传到服务器（其他电脑同步后即可看到）');
-        updateSyncStatus();
+      }).then(function(){
+        markUploaded(quiet);
         return true;
       }).catch(function(e){
         if(!quiet) toast('上传失败：'+e.message+'（请确认服务器已启动；数据还在本机，可稍后重试）','err');
         return false;
       });
   }
-  var tok = syncSettings().token;
-  if(!tok){ if(!quiet) toast('请先在云同步设置里填写 GitHub 访问令牌','err'); return Promise.resolve(false); }
-  var payload = { state: state, updatedAt: new Date().toISOString() };
-  var content = b64EncodeUnicode(JSON.stringify(payload));
-  var api = 'https://api.github.com/repos/'+SYNC_REPO+'/contents/'+SYNC_FILE;
-  function doPut(sha){
-    var body = { message: '食堂采购数据同步', content: content };
-    if(sha) body.sha = sha;
-    return syncFetch(api, { method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body) }).then(function(r){
-      if(r.status === 409) return 'retry';
+  var url = SYNC_SUPABASE_URL + '/rest/v1/sync_data?id=eq.1';
+  return fetch(url, { method:'PATCH', headers: supabaseHeaders({ 'Content-Type':'application/json', 'Prefer':'return=minimal' }), body: JSON.stringify({ data: state, updated_at: new Date().toISOString() }) })
+    .then(function(r){
+      if(r.status===404){ if(!quiet) toast('云端表未建好，请先运行建表 SQL','err'); return false; }
       if(!r.ok) throw new Error('HTTP '+r.status);
-      return r.json();
+      markUploaded(quiet);
+      return true;
+    }).catch(function(e){
+      if(!quiet) toast('上传失败：'+e.message+'（请检查网络；数据还在本机，可稍后重试）','err');
+      return false;
     });
-  }
-  return syncFetch(api, { method:'GET' }).then(function(r){
-    if(r.status === 404) return null;
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    return r.json();
-  }).then(function(meta){
-    return doPut(meta ? meta.sha : null);
-  }).then(function(res){
-    if(res === 'retry'){
-      return syncFetch(api, { method:'GET' }).then(function(r2){ return r2.json(); }).then(function(m2){ return doPut(m2.sha); });
-    }
-    return res;
-  }).then(function(){
-    var ss = syncSettings();
-    state.settings.sync = { token: ss.token, lastUp: new Date().toISOString(), lastDown: ss.lastDown };
-    saveState();
-    if(!quiet) toast('已上传到线上（其他电脑同步后即可看到）');
-    updateSyncStatus();
-    return true;
-  }).catch(function(e){
-    if(!quiet) toast('上传失败：'+e.message+'（请检查令牌/网络；数据还在本机，可稍后重试）','err');
-    return false;
-  });
+}
+function markUploaded(quiet){
+  var ss = syncSettings();
+  state.settings.sync = { token: ss.token, lastUp: new Date().toISOString(), lastDown: ss.lastDown };
+  saveState();
+  if(!quiet) toast('已上传到云端（其他电脑同步后即可看到）');
+  updateSyncStatus();
 }
 function autoSyncOnLoad(){
   if(syncMode()==='server'){ downloadFromServer(true); return; }
-  if(syncSettings().token) downloadFromServer(true);
+  downloadFromServer(true);
 }
 function autoSyncOnSave(){
   if(syncMode()==='server'){ uploadToServer(false); return; }
-  if(syncSettings().token) uploadToServer(false);
+  uploadToServer(false);
 }
 /* ================= 初始化与事件绑定 ================= */
 function fillYearMonths(){
