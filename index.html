@@ -379,7 +379,16 @@ body{font-size:16px}
           <div class="chart-box" id="report-board-chart-y"></div>
         </div>
       </div>
-      <div class="tbl-wrap" id="report-board-table" style="margin-top:12px"></div>
+      <div class="grid2" style="margin-top:12px">
+        <div>
+          <div style="font-size:15px;font-weight:600;margin-bottom:6px">👔 职员 · 每日明细</div>
+          <div class="tbl-wrap" id="report-board-table-z"></div>
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:600;margin-bottom:6px">🧑 员工 · 每日明细</div>
+          <div class="tbl-wrap" id="report-board-table-y"></div>
+        </div>
+      </div>
       <div class="hint" style="margin-top:8px">实际人均超过预警线（职员 12 元 / 员工 6 元，可在系统设置调整）的天数会标记 ⚠️ 超预警。</div>
     </div>
   </section>
@@ -1432,20 +1441,27 @@ function renderMonthlyBoard(){
     kpiCard('⚠️','职员超预警天数', String(overZ)+' 天','','kic-r')+
     kpiCard('⚠️','员工超预警天数', String(overY)+' 天','','kic-r');
 
+  function renderGroupTable(elId, gRows){
+    var el = $(elId);
+    if(!gRows.length){ el.innerHTML = '<div class="empty-state">该月暂无数据</div>'; return; }
+    el.innerHTML = '<table class="tbl"><thead><tr><th>日期</th><th class="num">就餐人次</th><th class="num">实际人均(元)</th><th class="num">预测人均(元)</th><th class="num">差额(实际-预测)</th><th class="center">预警</th></tr></thead><tbody>'+
+      gRows.map(function(r){
+        var diff = (r.act!=null && r.pred!=null) ? r2(r.act - r.pred) : null;
+        var wk = r.over ? '<span class="tag" style="background:var(--danger-light);color:var(--danger);font-weight:600">⚠️ 超预警</span>' : '<span class="tag tag-empty">正常</span>';
+        return '<tr><td>'+r.ds+'</td><td class="num">'+r.people+'</td><td class="num" style="font-weight:600">'+(r.act!=null?'¥'+money(r.act):'—')+'</td><td class="num">'+(r.pred!=null?'¥'+money(r.pred):'—')+'</td><td class="num">'+(diff!=null?fmtDiff(diff,''):'—')+'</td><td class="center">'+wk+'</td></tr>';
+      }).join('')+'</tbody></table>';
+  }
   if(!labels.length){
     $('report-board-chart-z').innerHTML = '<div class="empty-state">该月份暂无数据</div>';
     $('report-board-chart-y').innerHTML = '<div class="empty-state">该月份暂无数据</div>';
-    $('report-board-table').innerHTML = '';
+    renderGroupTable('report-board-table-z', []);
+    renderGroupTable('report-board-table-y', []);
     return;
   }
   dualLineChart('report-board-chart-z', labels, actZ, predZArr, {colorA:'#2563eb', colorB:'#f59e0b', nameA:'实际人均', nameB:'预测人均'});
   dualLineChart('report-board-chart-y', labels, actY, predYArr, {colorA:'#2563eb', colorB:'#f59e0b', nameA:'实际人均', nameB:'预测人均'});
-  $('report-board-table').innerHTML = '<table class="tbl"><thead><tr><th>日期</th><th>人员</th><th class="num">就餐人次</th><th class="num">实际人均(元)</th><th class="num">预测人均(元)</th><th class="num">差额(实际-预测)</th><th class="center">预警</th></tr></thead><tbody>'+
-    rows.map(function(r){
-      var diff = (r.act!=null && r.pred!=null) ? r2(r.act - r.pred) : null;
-      var wk = r.over ? '<span class="tag" style="background:var(--danger-light);color:var(--danger);font-weight:600">⚠️ 超预警</span>' : '<span class="tag tag-empty">正常</span>';
-      return '<tr><td>'+r.ds+'</td><td><span class="tag tag-grp">'+esc(r.g)+'</span></td><td class="num">'+r.people+'</td><td class="num" style="font-weight:600">'+(r.act!=null?'¥'+money(r.act):'—')+'</td><td class="num">'+(r.pred!=null?'¥'+money(r.pred):'—')+'</td><td class="num">'+(diff!=null?fmtDiff(diff,''):'—')+'</td><td class="center">'+wk+'</td></tr>';
-    }).join('')+'</tbody></table>';
+  renderGroupTable('report-board-table-z', rows.filter(function(r){ return r.g==='职员'; }));
+  renderGroupTable('report-board-table-y', rows.filter(function(r){ return r.g==='员工'; }));
 }
 
 /* ================= 食材库 ================= */
