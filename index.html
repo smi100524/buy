@@ -257,6 +257,22 @@ body{font-size:16px}
 #page-entry .item-row input,#page-entry .item-row select{padding:10px 11px;font-size:16px}
 #entry-sheet .item-row input,#entry-sheet .item-row select{padding:10px 11px;font-size:16px}
 
+/* ============ 每日采购表：网格线 + 行高亮 ============ */
+#entry-sheet .items-wrap{border:1px solid #cfd9d2}
+#entry-sheet .item-row.sheet{gap:0;border-bottom:1px solid #e2e9e4;transition:background .1s}
+#entry-sheet .item-row.sheet:last-child{border-bottom:none}
+#entry-sheet .item-row.sheet > *{border-right:1px solid #e8eee9;min-width:0}
+#entry-sheet .item-row.sheet > *:last-child{border-right:none}
+#entry-sheet .item-row.sheet.head{background:#eef5f1;border-bottom:1px solid #cfd9d2}
+#entry-sheet .item-row.sheet input{border:none;background:transparent;border-radius:0;padding:9px 8px}
+#entry-sheet .item-row.sheet input:focus{background:#eaf6ff;box-shadow:inset 0 0 0 2px rgba(37,99,235,.25)}
+#entry-sheet .item-row.sheet .amt{text-align:right;padding:9px 8px}
+#entry-sheet .item-row.sheet .auto-cell{padding:9px 4px;border-radius:0}
+#entry-sheet .item-row.sheet:not(.head):hover{background:#e8f4ff}
+#entry-sheet .item-row.sheet:not(.head):hover .auto-cell{background:#e8f4ff}
+#entry-sheet .item-row.sheet:not(.head).sel{background:#dcecff;box-shadow:inset 3px 0 0 #2563eb}
+#entry-sheet .item-row.sheet:not(.head).sel .auto-cell{background:#dcecff}
+
 </style>
 </head>
 <body>
@@ -1018,6 +1034,11 @@ function bindItemRow(row, container){
   row.querySelector('.f-qty').addEventListener('input', updateGroupTotal);
   var del = row.querySelector('.del');
   if(del) del.addEventListener('click', function(){ row.remove(); renumberSheet(); updateGroupTotal(); });
+  row.addEventListener('click', function(){
+    var all = document.querySelectorAll('#entry-sheet .item-row.sheet');
+    for(var i=0;i<all.length;i++) all[i].classList.remove('sel');
+    row.classList.add('sel');
+  });
 }
 function fillFromIngredient(row){
   var name = row.querySelector('.f-name').value.trim();
