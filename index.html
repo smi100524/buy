@@ -294,6 +294,10 @@ body{font-size:16px}
 #report-board-kpis .kpi .v{font-size:23px;white-space:nowrap}
 #report-board-kpis .kpi{min-width:0}
 
+.btn-sync-now{border:none;background:#fff;color:var(--primary-dark);padding:10px 16px;border-radius:10px;cursor:pointer;font-size:15px;font-weight:700;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.btn-sync-now:hover{background:#e8f7ef}
+.btn-sync-now:active{transform:translateY(1px)}
+
 </style>
 </head>
 <body>
@@ -314,6 +318,7 @@ body{font-size:16px}
       <button data-page="ingredients"><span class="ic">🥬</span>食材库</button>
       <button data-page="settings"><span class="ic">⚙️</span>系统设置</button>
     </nav>
+    <button class="btn-sync-now" id="btn-sync-now" title="立即同步数据到本机">🔄 同步数据</button>
     <button class="btn-lock" id="btn-lock" title="锁定系统">🔒</button>
   </div>
 </header>
@@ -2549,6 +2554,7 @@ function bindEvents(){
   $('btn-login').addEventListener('click', doLogin);
   $('login-pw').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
   $('btn-lock').addEventListener('click', lockApp);
+  $('btn-sync-now').addEventListener('click', function(){ downloadFromServer(false); });
   $('btn-save-pw').addEventListener('click', savePassword);
 
   var closes = document.querySelectorAll('[data-close]');
