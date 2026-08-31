@@ -187,7 +187,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px;background:#fff}
 .cmp-sub{font-size:10.5px;color:var(--muted);font-weight:400}
 
 /* 原表格式的明细表 */
-.item-row.sheet{grid-template-columns:40px minmax(60px,0.4fr) 96px 56px 66px 82px 92px 106px minmax(90px,1fr) 76px}
+.item-row.sheet{grid-template-columns:40px minmax(60px,0.4fr) 96px 56px 100px 82px 92px 106px minmax(90px,1fr) 76px}
 .item-row.sheet .auto-cell{background:#f3f7f4;color:#374151;font-size:12.5px;text-align:center;padding:6px 4px;border-radius:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .item-row.sheet .amt{font-weight:700;color:var(--primary-dark);text-align:right;padding:0 4px;font-size:13px}
 
@@ -231,7 +231,7 @@ body{font-size:16px}
 .item-row{gap:8px;padding:9px 11px}
 .item-row input,.item-row select{padding:9px 10px;font-size:15px;border-radius:8px}
 .item-row.sheet .auto-cell{font-size:14px;padding:10px 4px}
-.item-row.sheet{grid-template-columns:44px minmax(60px,0.4fr) 96px 58px 68px 84px 94px 106px minmax(90px,1fr) 76px}
+.item-row.sheet{grid-template-columns:44px minmax(60px,0.4fr) 96px 58px 104px 84px 94px 106px minmax(90px,1fr) 76px}
 .item-row.head{font-size:14.5px}
 .cal-day{min-height:92px;padding:8px 9px}
 .cal-day .dnum{font-size:14.5px}
@@ -264,8 +264,8 @@ body{font-size:16px}
 #entry-sheet .item-row.sheet > *{border-right:1px solid #e8eee9;min-width:0}
 #entry-sheet .item-row.sheet > *:last-child{border-right:none}
 #entry-sheet .item-row.sheet.head{background:#eef5f1;border-bottom:1px solid #cfd9d2}
-#entry-sheet .item-row.sheet input{border:none;background:transparent;border-radius:0;padding:9px 8px}
-#entry-sheet .item-row.sheet input:not([readonly]):focus{background:#eaf6ff;box-shadow:inset 0 0 0 2px rgba(37,99,235,.25)}
+#entry-sheet .item-row.sheet input{border:2px solid #9aa9b8;background:#fff;border-radius:7px;padding:8px 9px;font-size:16px}
+#entry-sheet .item-row.sheet input:not([readonly]):focus{border-color:#2563eb;background:#f0f7ff;box-shadow:0 0 0 3px rgba(37,99,235,.18)}
 #entry-sheet .item-row.sheet .amt{text-align:right;padding:9px 8px}
 #entry-sheet .item-row.sheet .auto-cell{padding:9px 4px;border-radius:0}
 #entry-sheet .item-row.sheet:not(.head):hover{background:#e8f4ff}
