@@ -1028,13 +1028,13 @@ function renderEntrySheet(){
 function buildRowHTML(data, idx){
   data = data||{};
   var amt = r2((Number(data.qty)||0)*(Number(data.price)||0));
-  var priceVal = data.price!=null ? data.price : '';
+  var priceTxt = data.price!=null ? ('¥'+money(data.price)) : '';
   return '<span class="auto-cell seq">'+(idx+1)+'</span>'+
     '<input class="f-name" list="dl-ingredients" placeholder="食材名称" value="'+esc(data.name||'')+'">'+
     '<span class="auto-cell f-cat-d">'+esc(data.category||'')+'</span>'+
-    '<input class="f-unit-d" list="dl-units" placeholder="单位" value="'+esc(data.unit||'')+'">'+
+    '<span class="auto-cell f-unit-d">'+esc(data.unit||'')+'</span>'+
     '<input class="f-qty" type="number" min="0" step="any" value="'+(data.qty!=null?data.qty:'')+'" placeholder="数量">'+
-    '<input class="f-price-d" type="number" min="0" step="any" value="'+priceVal+'" placeholder="单价">'+
+    '<span class="auto-cell f-price-d" data-price="'+(data.price!=null?data.price:'')+'">'+priceTxt+'</span>'+
     '<div class="amt">¥'+money(amt)+'</div>'+
     '<span class="auto-cell f-spec-d">'+esc(data.spec||'')+'</span>'+
     '<input class="f-note" value="'+esc(data.note||'')+'" placeholder="备注">'+
@@ -1056,8 +1056,6 @@ function bindItemRow(row, container){
   name.addEventListener('change', function(){ fillFromIngredient(row); updateGroupTotal(); });
   name.addEventListener('input', updateGroupTotal);
   row.querySelector('.f-qty').addEventListener('input', updateGroupTotal);
-  row.querySelector('.f-unit-d').addEventListener('input', updateGroupTotal);
-  row.querySelector('.f-price-d').addEventListener('input', updateGroupTotal);
   var ins = row.querySelector('.ins');
   if(ins) ins.addEventListener('click', function(){
     var newRow = document.createElement('div');
@@ -1075,32 +1073,19 @@ function bindItemRow(row, container){
     for(var i=0;i<all.length;i++) all[i].classList.remove('sel');
     row.classList.add('sel');
   });
-  setReadonlyState(row);
-}
-function setReadonlyState(row){
-  var name = row.querySelector('.f-name').value.trim();
-  var it = name ? state.ingredients.find(function(x){ return x.name===name; }) : null;
-  var unitIn = row.querySelector('.f-unit-d');
-  var priceIn = row.querySelector('.f-price-d');
-  if(unitIn) unitIn.readOnly = !!it;
-  if(priceIn) priceIn.readOnly = !!it;
 }
 function fillFromIngredient(row){
   var name = row.querySelector('.f-name').value.trim();
-  var unitIn = row.querySelector('.f-unit-d');
-  var priceIn = row.querySelector('.f-price-d');
-  var it = name ? state.ingredients.find(function(x){ return x.name===name; }) : null;
+  if(!name) return;
+  var it = state.ingredients.find(function(x){ return x.name===name; });
   if(it){
+    row.querySelector('.f-unit-d').textContent = it.unit||'';
     row.querySelector('.f-cat-d').textContent = it.category||'';
     row.querySelector('.f-spec-d').textContent = it.spec||'';
-    unitIn.value = it.unit||'';
-    priceIn.value = it.price!=null?it.price:'';
-  } else {
-    row.querySelector('.f-cat-d').textContent = '';
-    row.querySelector('.f-spec-d').textContent = '';
+    var pd = row.querySelector('.f-price-d');
+    pd.dataset.price = it.price!=null?it.price:'';
+    pd.textContent = it.price!=null ? ('¥'+money(it.price)) : '';
   }
-  setReadonlyState(row);
-  updateGroupTotal();
 }
 function collectItems(){
   var out=[];
@@ -1110,11 +1095,11 @@ function collectItems(){
     var name = row.querySelector('.f-name').value.trim();
     if(!name) continue;
     var qty = Number(row.querySelector('.f-qty').value);
-    var price = Number(row.querySelector('.f-price-d').value)||0;
+    var price = Number(row.querySelector('.f-price-d').dataset.price)||0;
     out.push({
       name:name,
       qty: isFinite(qty)?qty:0,
-      unit: row.querySelector('.f-unit-d').value.trim(),
+      unit: row.querySelector('.f-unit-d').textContent.trim(),
       category: row.querySelector('.f-cat-d').textContent.trim(),
       spec: row.querySelector('.f-spec-d').textContent.trim(),
       price: isFinite(price)?price:0,
@@ -1132,7 +1117,7 @@ function updateGroupTotal(){
     var amtEl = rows[i].querySelector('.amt');
     if(amtEl){
       var q = Number(rows[i].querySelector('.f-qty').value)||0;
-      var pr = Number(rows[i].querySelector('.f-price-d').value)||0;
+      var pr = Number(rows[i].querySelector('.f-price-d').dataset.price)||0;
       amtEl.textContent = '¥'+money(r2(q*pr));
     }
   }
