@@ -1569,7 +1569,13 @@ function sheetXml(sheet, widths){
     });
     out.push('<row r="'+rn+'">'+cells.join('')+'</row>');
   });
-  out.push('</sheetData></worksheet>');
+  out.push('</sheetData>');
+  if(sheet.mergeCells && sheet.mergeCells.length){
+    out.push('<mergeCells count="'+sheet.mergeCells.length+'">');
+    sheet.mergeCells.forEach(function(m){ out.push('<mergeCell ref="'+m+'"/>'); });
+    out.push('</mergeCells>');
+  }
+  out.push('</worksheet>');
   return out.join('');
 }
 function calcWidths(rows){
@@ -1627,22 +1633,29 @@ function stylesXml(){
   '<numFmt numFmtId="165" formatCode="0.00"/>'+
   '<numFmt numFmtId="166" formatCode="#,##0"/>'+
   '</numFmts>'+
-  '<fonts count="2">'+
+  '<fonts count="5">'+
   '<font><sz val="11"/><name val="Calibri"/></font>'+
   '<font><b/><sz val="11"/><name val="Calibri"/></font>'+
+  '<font><b/><sz val="18"/><name val="Microsoft YaHei"/></font>'+
+  '<font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Microsoft YaHei"/></font>'+
+  '<font><sz val="11"/><name val="Microsoft YaHei"/></font>'+
   '</fonts>'+
-  '<fills count="3">'+
+  '<fills count="4">'+
   '<fill><patternFill patternType="none"/></fill>'+
   '<fill><patternFill patternType="gray125"/></fill>'+
   '<fill><patternFill patternType="solid"><fgColor rgb="FFDDEEE4"/><bgColor indexed="64"/></patternFill></fill>'+
+  '<fill><patternFill patternType="solid"><fgColor rgb="FF00B050"/><bgColor indexed="64"/></patternFill></fill>'+
   '</fills>'+
   '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'+
   '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
-  '<cellXfs count="4">'+
+  '<cellXfs count="7">'+
   '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
   '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>'+
-  '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'+
-  '<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'+
+  '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"><alignment horizontal="right" vertical="center"/></xf>'+
+  '<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"><alignment horizontal="right" vertical="center"/></xf>'+
+  '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"><alignment horizontal="center" vertical="center"/></xf>'+
+  '<xf numFmtId="0" fontId="3" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment horizontal="center" vertical="center"/></xf>'+
+  '<xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1"><alignment horizontal="center" vertical="center"/></xf>'+
   '</cellXfs>'+
   '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'+
   '</styleSheet>';
@@ -1656,7 +1669,8 @@ function buildXlsx(sheets){
   entries.push({name:'xl/_rels/workbook.xml.rels', data:enc.encode(workbookRelsXml(sheets.length))});
   entries.push({name:'xl/styles.xml', data:enc.encode(stylesXml())});
   sheets.forEach(function(s,i){
-    entries.push({name:'xl/worksheets/sheet'+(i+1)+'.xml', data:enc.encode(sheetXml(s, calcWidths(s.rows)))});
+    var w = s.colWidths || calcWidths(s.rows);
+    entries.push({name:'xl/worksheets/sheet'+(i+1)+'.xml', data:enc.encode(sheetXml(s, w))});
   });
   return zipStore(entries);
 }
@@ -1788,28 +1802,28 @@ function buildMonthSheet(y,m,group){
 /* ---------- 每日采购表（按原表格式） ---------- */
 function buildDailySheet(date, group){
   var sum = daySummary(date, group);
-  var prev = daySummary(prevDay(date), group);
-  var pred = dayPredict(date, group);
-  var prevPred = dayPredict(prevDay(date), group);
   var rec = getRecord(date, group);
-  var dLabel = date.slice(5).replace('-','月')+'日';
+  var d = new Date(date+'T00:00:00');
+  var dLabel = (d.getMonth()+1)+'月'+d.getDate()+'日';
+  var title = d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日'+group+'食材采购表';
+  var C6 = {v:'', s:6};
   var rows = [];
-  rows.push([HDR(dLabel+group+'餐总费用'), '', '', YUAN(sum.total)]);
-  rows.push([HDR('数据环比'), '', HDR('采购食材费用'), HDR('就餐人次'), HDR('人均食材费用'), HDR('人均粮油'), '', HDR('人均调味料'), '', HDR('当日人均'), HDR('预测人均')]);
-  rows.push(['今日', '', YUAN(sum.food), NUM(sum.people), YUAN(sum.perFood), NUM(stdGrain(group)), '', NUM(stdCond(group)), '', YUAN(sum.perCapita), YUAN(pred)]);
-  rows.push(['昨日', '', YUAN(prev.food), NUM(prev.people), YUAN(prev.perFood), NUM(stdGrain(group)), '', NUM(stdCond(group)), '', YUAN(prev.perCapita), YUAN(prevPred)]);
-  rows.push(['对比增减', '', YUAN(sum.food-prev.food), NUM(sum.people-prev.people), YUAN(sum.perFood-prev.perFood), 0, '', 0, '', YUAN(sum.perCapita-prev.perCapita), YUAN(pred-prevPred)]);
-  rows.push([]);
-  rows.push([dLabel+group+'食材费用']);
-  rows.push([HDR('序号'), HDR('日期'), HDR('食材名称'), HDR('类别'), HDR('规格/型号'), HDR('单位'), HDR('数量'), HDR('单价'), HDR('单项金额'), HDR('备注'), HDR('人数')]);
+  rows.push([{v:title, s:4}, C6, C6, C6, C6, C6, C6, C6, C6, C6, C6]);
+  rows.push([
+    {v:'序号', s:5}, {v:'日期', s:5}, {v:'食材名称', s:5}, {v:'类别', s:5}, {v:'规格/型号', s:5},
+    {v:'单位', s:5}, {v:'数量', s:5}, {v:'单价', s:5}, {v:'单项金额', s:5}, {v:'备注', s:5}, {v:'人数', s:5}
+  ]);
   var items = rec ? rec.items : [];
   items.forEach(function(it, i){
-    rows.push([NUM(i+1), dLabel, it.name, it.category||'', it.spec||'', it.unit||'', NUM(it.qty), YUAN(it.price), YUAN(r2(it.qty*it.price)), it.note||'', NUM(sum.people)]);
+    rows.push([
+      {v:i+1, s:6}, {v:dLabel, s:6}, {v:it.name, s:6}, {v:it.category||'', s:6}, {v:it.spec||'', s:6},
+      {v:it.unit||'', s:6}, {v:Number(it.qty)||0, s:6}, {v:Number(it.price)||0, s:2}, {v:r2(it.qty*it.price), s:2},
+      {v:it.note||'', s:6}, {v:sum.people, s:6}
+    ]);
   });
-  rows.push([]);
-  rows.push(['合计', '', '', '', '', '', '', '', YUAN(sum.total), '', NUM(sum.people)]);
-  return [{ name: group, rows: rows }];
+  return [{ name: group, rows: rows, mergeCells:['A1:J1'], colWidths:[15.1,11.3,17.1,16.5,19.1,11.6,10,9.7,11,17.4,11.3] }];
 }
+
 function buildDailyAll(date){
   var sheets = [];
   state.groups.forEach(function(g){ sheets = sheets.concat(buildDailySheet(date, g)); });
