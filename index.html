@@ -971,10 +971,12 @@ function renderEntrySheet(){
   var itemsBox = sheet.querySelector('.g-items');
   if(rec && rec.items.length){
     rec.items.forEach(function(it, idx){ addItemRow(itemsBox, it, idx, date, sum.people); });
+    for(var p=rec.items.length; p<30; p++) addItemRow(itemsBox, null, p, date, sum.people);
   } else {
-    for(var i=0;i<5;i++) addItemRow(itemsBox, null, i, date, sum.people);
+    for(var i=0;i<30;i++) addItemRow(itemsBox, null, i, date, sum.people);
   }
-  sheet.querySelector('.g-add').addEventListener('click', function(){ addItemRow(itemsBox, null, itemsBox.children.length, date, sum.people); updateGroupTotal(); });
+  renumberSheet();
+  sheet.querySelector('.g-add').addEventListener('click', function(){ addItemRow(itemsBox, null, itemsBox.children.length, date, sum.people); renumberSheet(); updateGroupTotal(); });
   sheet.querySelector('.g-save').addEventListener('click', function(){ saveGroupEntry(); });
   sheet.querySelector('.g-del').addEventListener('click', function(){ deleteGroupEntry(); });
   sheet.querySelector('.g-export').addEventListener('click', exportDailyXlsx);
@@ -1013,7 +1015,7 @@ function bindItemRow(row, container){
   row.querySelector('.f-qty').addEventListener('input', updateGroupTotal);
   row.querySelector('.f-price').addEventListener('input', updateGroupTotal);
   var del = row.querySelector('.del');
-  if(del) del.addEventListener('click', function(){ row.remove(); updateGroupTotal(); });
+  if(del) del.addEventListener('click', function(){ row.remove(); renumberSheet(); updateGroupTotal(); });
 }
 function fillFromIngredient(row){
   var name = row.querySelector('.f-name').value.trim();
@@ -1051,8 +1053,24 @@ function updateGroupTotal(){
   var items = collectItems();
   var total = itemsAmount(items);
   var people = Number(document.querySelector('#entry-sheet .g-people').value)||0;
+  var rows = document.querySelectorAll('#entry-sheet .g-items .item-row');
+  for(var i=0;i<rows.length;i++){
+    var amtEl = rows[i].querySelector('.amt');
+    if(amtEl){
+      var q = Number(rows[i].querySelector('.f-qty').value)||0;
+      var pr = Number(rows[i].querySelector('.f-price').value)||0;
+      amtEl.textContent = '¥'+money(r2(q*pr));
+    }
+  }
   var el = document.querySelector('#entry-sheet .g-total');
   if(el) el.textContent = '合计 ¥'+money(total)+(people>0 ? '（人均 ¥'+money(total/people)+'）' : '');
+}
+function renumberSheet(){
+  var rows = document.querySelectorAll('#entry-sheet .g-items .item-row');
+  for(var i=0;i<rows.length;i++){
+    var seq = rows[i].querySelector('.seq');
+    if(seq) seq.textContent = i+1;
+  }
 }
 function saveGroupEntry(){
   var date = current.entryDate, g = current.entryGroup;
