@@ -1170,7 +1170,6 @@ function saveGroupEntry(){
     state.records.push({ id:uid('r'), date:date, group:g, people:people, note:note, items:items });
   }
   saveState();
-  autoSyncOnSave();
   renderEntry();
   toast('已保存 '+date+' '+g+'（¥'+money(itemsAmount(items))+'）');
 }
@@ -1572,7 +1571,7 @@ function renderSettings(){
   if(help){
     help.textContent = syncMode()==='server'
       ? '服务器每天 0 点还会自动同步就餐人数看板的实际人数。各电脑只需打开 ' + location.origin + ' 即可自动同步，无需令牌。'
-      : '云端模式：数据保存在 Supabase 云数据库（HTTPS、永久保存），各电脑打开即自动同步。保存后自动上传、打开时自动下载，也可点顶部「🔄 同步数据」手动同步。';
+      : '云端模式：数据保存在 Supabase 云数据库（HTTPS、永久保存）。同步为手动：点顶部「🔄 同步数据」拉取云端数据到本机、点「⬆️ 上传数据」把本机数据推送到云端。';
   }
   var html = '<div class="tbl-wrap" style="max-width:760px;margin-bottom:12px"><table class="tbl"><thead><tr><th>人员分组</th><th class="num">预计人均调味料(元/人·天)</th><th class="num">预计人均粮油(元/人·天)</th><th class="num">人均预警线(元/人·天)</th></tr></thead><tbody>';
   state.groups.forEach(function(g){
@@ -2375,10 +2374,10 @@ function updateSyncStatus(){
   if(ss.lastUp) parts.push('上次上传 ' + new Date(ss.lastUp).toLocaleString());
   if(ss.lastDown) parts.push('上次下载 ' + new Date(ss.lastDown).toLocaleString());
   if(syncMode()==='server'){
-    el.textContent = '当前为「局域网服务器」模式（' + location.origin + '）：打开本网址即自动同步，无需配置。保存后自动上传、打开时自动下载。' + (parts.length?(' ｜ '+parts.join('，')):'');
+    el.textContent = '当前为「局域网服务器」模式（' + location.origin + '）：手动同步——点顶部「🔄 同步数据」拉取、点「⬆️ 上传数据」推送。' + (parts.length?(' ｜ '+parts.join('，')):'');
     return;
   }
-  el.textContent = '当前为「Supabase 云数据库」模式：数据保存在您的 Supabase 云端，各电脑打开即自动同步、无需令牌。保存后自动上传、打开时自动下载。' + (parts.length?(' ｜ '+parts.join('，')):'');
+  el.textContent = '当前为「Supabase 云数据库」模式：数据保存在云端。手动同步——点顶部「🔄 同步数据」拉取更新、点「⬆️ 上传数据」推送。' + (parts.length?(' ｜ '+parts.join('，')):'');
 }
 function applyDownloadedState(stateData, updatedAt, quiet){
   var ss = syncSettings();
@@ -2555,8 +2554,6 @@ function init(){
   bindEvents();
   renderDashboard();
   checkLogin();
-  autoSyncOnLoad();
-  autoDiningOnLoad();
 }
 init();
 </script>
