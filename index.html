@@ -992,16 +992,17 @@ function addItemRow(container, data, idx, date, people){
   var row = document.createElement('div');
   row.className = 'item-row sheet';
   var amt = r2((Number(data.qty)||0)*(Number(data.price)||0));
+  var priceTxt = data.price!=null ? ('¥'+money(data.price)) : '';
   row.innerHTML =
     '<span class="auto-cell seq">'+(idx+1)+'</span>'+
     '<span class="auto-cell">'+(date?date.slice(5).replace('-','月')+'日':'')+'</span>'+
     '<input class="f-name" list="dl-ingredients" placeholder="食材名称" value="'+esc(data.name||'')+'">'+
-    '<select class="f-cat">'+catOptions(data.category||'')+'</select>'+
-    '<input class="f-unit" list="dl-units" value="'+esc(data.unit||'')+'" placeholder="斤">'+
+    '<span class="auto-cell f-cat-d">'+esc(data.category||'')+'</span>'+
+    '<span class="auto-cell f-unit-d">'+esc(data.unit||'')+'</span>'+
     '<input class="f-qty" type="number" min="0" step="any" value="'+(data.qty!=null?data.qty:'')+'" placeholder="数量">'+
-    '<input class="f-price" type="number" min="0" step="any" value="'+(data.price!=null?data.price:'')+'" placeholder="单价">'+
+    '<span class="auto-cell f-price-d" data-price="'+(data.price!=null?data.price:'')+'">'+priceTxt+'</span>'+
     '<div class="amt">¥'+money(amt)+'</div>'+
-    '<input class="f-spec" value="'+esc(data.spec||'')+'" placeholder="规格">'+
+    '<span class="auto-cell f-spec-d">'+esc(data.spec||'')+'</span>'+
     '<input class="f-note" value="'+esc(data.note||'')+'" placeholder="备注">'+
     '<button class="btn-icon del" title="删除此行">🗑️</button>';
   container.appendChild(row);
@@ -1016,7 +1017,6 @@ function bindItemRow(row, container){
   name.addEventListener('change', function(){ fillFromIngredient(row); updateGroupTotal(); });
   name.addEventListener('input', updateGroupTotal);
   row.querySelector('.f-qty').addEventListener('input', updateGroupTotal);
-  row.querySelector('.f-price').addEventListener('input', updateGroupTotal);
   var del = row.querySelector('.del');
   if(del) del.addEventListener('click', function(){ row.remove(); renumberSheet(); updateGroupTotal(); });
 }
@@ -1025,10 +1025,12 @@ function fillFromIngredient(row){
   if(!name) return;
   var it = state.ingredients.find(function(x){ return x.name===name; });
   if(it){
-    row.querySelector('.f-unit').value = it.unit||'';
-    row.querySelector('.f-cat').value = it.category||'其他';
-    row.querySelector('.f-spec').value = it.spec||'';
-    row.querySelector('.f-price').value = it.price!=null?it.price:'';
+    row.querySelector('.f-unit-d').textContent = it.unit||'';
+    row.querySelector('.f-cat-d').textContent = it.category||'';
+    row.querySelector('.f-spec-d').textContent = it.spec||'';
+    var pd = row.querySelector('.f-price-d');
+    pd.dataset.price = it.price!=null?it.price:'';
+    pd.textContent = it.price!=null ? ('¥'+money(it.price)) : '';
   }
 }
 function collectItems(){
@@ -1039,13 +1041,13 @@ function collectItems(){
     var name = row.querySelector('.f-name').value.trim();
     if(!name) continue;
     var qty = Number(row.querySelector('.f-qty').value);
-    var price = Number(row.querySelector('.f-price').value);
+    var price = Number(row.querySelector('.f-price-d').dataset.price)||0;
     out.push({
       name:name,
       qty: isFinite(qty)?qty:0,
-      unit: row.querySelector('.f-unit').value.trim(),
-      category: row.querySelector('.f-cat').value,
-      spec: row.querySelector('.f-spec').value.trim(),
+      unit: row.querySelector('.f-unit-d').textContent.trim(),
+      category: row.querySelector('.f-cat-d').textContent.trim(),
+      spec: row.querySelector('.f-spec-d').textContent.trim(),
       price: isFinite(price)?price:0,
       note: row.querySelector('.f-note').value.trim()
     });
@@ -1061,7 +1063,7 @@ function updateGroupTotal(){
     var amtEl = rows[i].querySelector('.amt');
     if(amtEl){
       var q = Number(rows[i].querySelector('.f-qty').value)||0;
-      var pr = Number(rows[i].querySelector('.f-price').value)||0;
+      var pr = Number(rows[i].querySelector('.f-price-d').dataset.price)||0;
       amtEl.textContent = '¥'+money(r2(q*pr));
     }
   }
