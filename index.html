@@ -2300,6 +2300,22 @@ function diningPasteText(){
     toast('已导入 '+n+' 天的实际就餐人数');
   }catch(e){ toast('粘贴失败：'+e.message,'err'); }
 }
+
+function autoDiningOnLoad(){
+  var dd = diningData();
+  if(!dd || !dd.url) return;
+  var url = dd.url.replace(/\/+$/,'');
+  var ctrl = new AbortController();
+  var t = setTimeout(function(){ ctrl.abort(); }, 10000);
+  fetch(url + '/api/state', { signal: ctrl.signal }).then(function(r){
+    clearTimeout(t);
+    if(!r.ok) return null;
+    return r.json();
+  }).then(function(d){
+    if(d) parseDiningPayload(d);
+  }).catch(function(){});
+}
+
 /* ============ 云同步（线上 GitHub 存储，多台电脑共用） ============ */
 var SYNC_REPO = 'smi100524/buy';
 var SYNC_BRANCH = 'main';
@@ -2485,6 +2501,7 @@ function init(){
   renderDashboard();
   checkLogin();
   autoSyncOnLoad();
+  autoDiningOnLoad();
 }
 init();
 </script>
