@@ -334,6 +334,8 @@ body{font-size:16px}
         <div class="field"><label>采购日期</label><input type="date" id="entry-date"></div>
         <button class="btn btn-ghost" id="btn-prev-day">◀ 前一天</button>
         <button class="btn btn-ghost" id="btn-next-day">后一天 ▶</button>
+        <button class="btn btn-outline" id="btn-copy-tpl">📋 复制模板</button>
+        <div class="field" style="width:168px"><label>模板日期</label><input type="date" id="tpl-date" value="2026-09-01"></div>
         <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap" id="entry-tabs"></div>
       </div>
     </div>
@@ -1163,6 +1165,23 @@ function deleteGroupEntry(){
   renderEntry();
   toast('已删除 '+date+' '+g+' 的记录');
 }
+
+function copyTemplate(){
+  var src = document.getElementById('tpl-date').value;
+  var dst = current.entryDate;
+  var g = current.entryGroup;
+  if(!src){ toast('请选择模板日期','err'); return; }
+  if(src===dst){ toast('模板日期与当前日期相同，请选择其他日期','err'); return; }
+  var srcRec = getRecord(src, g);
+  if(!srcRec || !srcRec.items.length){ toast(src+' '+g+' 还没有可复制的菜品，请先到该天录入','err'); return; }
+  var itemsBox = document.querySelector('#entry-sheet .g-items');
+  itemsBox.innerHTML = '';
+  srcRec.items.forEach(function(it, i){ addItemRow(itemsBox, it, i); });
+  renumberSheet();
+  updateGroupTotal();
+  toast('已将 '+src+' '+g+' 的 '+srcRec.items.length+' 项菜品复制到 '+dst+'，核对后点保存');
+}
+
 /* ================= 台账 ================= */
 function expCell(actual, expect){
   var cls = actual>expect ? 'cmp-up' : (actual<expect ? 'cmp-down' : 'cmp-flat');
@@ -2183,6 +2202,7 @@ function bindEvents(){
   $('entry-date').addEventListener('change', function(){ current.entryDate = $('entry-date').value; renderEntry(); });
   $('btn-prev-day').addEventListener('click', function(){ current.entryDate = prevDay(current.entryDate); renderEntry(); });
   $('btn-next-day').addEventListener('click', function(){ var d=new Date(current.entryDate+'T00:00:00'); d.setDate(d.getDate()+1); current.entryDate = d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); renderEntry(); });
+  $('btn-copy-tpl').addEventListener('click', copyTemplate);
 
   $('ledger-year').addEventListener('change', function(){ current.ledgerY = Number($('ledger-year').value); renderLedger(); });
   $('ledger-month').addEventListener('change', function(){ current.ledgerM = Number($('ledger-month').value); renderLedger(); });
