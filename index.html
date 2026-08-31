@@ -289,6 +289,11 @@ body{font-size:16px}
 #entry-sheet .item-row.sheet .ops .ins:hover{background:#eaf6ff;border-color:#2563eb}
 #entry-sheet .item-row.sheet .ops .del{width:34px;height:32px;display:inline-flex;align-items:center;justify-content:center;padding:0}
 
+/* 修复显示不全：表格项可收缩；看板数值稍小 */
+#entry-sheet .item-row.sheet > *{min-width:0}
+#report-board-kpis .kpi .v{font-size:23px;white-space:nowrap}
+#report-board-kpis .kpi{min-width:0}
+
 </style>
 </head>
 <body>
@@ -364,7 +369,7 @@ body{font-size:16px}
         <button class="btn btn-outline" id="btn-export-month">导出本月 Excel</button>
         <button class="btn btn-outline" id="btn-export-all">导出全部 Excel</button>
       </div>
-      <div class="kpis" id="report-board-kpis" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:14px 0 12px"></div>
+      <div class="kpis" id="report-board-kpis" style="grid-template-columns:repeat(auto-fit,minmax(215px,1fr));margin:14px 0 12px"></div>
       <div class="chart-box" id="report-board-chart"></div>
       <div class="tbl-wrap" id="report-board-table" style="margin-top:12px"></div>
       <div class="hint" style="margin-top:8px">实际人均超过预警线（职员 12 元 / 员工 6 元，可在系统设置调整）的天数会标记 ⚠️ 超预警。</div>
@@ -514,6 +519,7 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ re
 function uid(p){ return (p||'x')+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function r2(n){ return Math.round((Number(n)||0)*100)/100; }
 function money(n){ return (Number(n)||0).toFixed(2); }
+function moneyC(n){ return '¥' + (Number(n)||0).toLocaleString('zh-CN', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
 function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function pad2(n){ return String(n).padStart(2,'0'); }
 function monthDays(y,m){ return new Date(y,m,0).getDate(); }
@@ -1401,13 +1407,13 @@ function renderMonthlyBoard(){
   var predZ = monthPredict(y,m,'职员');
   var predY = monthPredict(y,m,'员工');
   $('report-board-kpis').innerHTML =
-    kpiCard('💴','总食材费用','¥'+money(foodAll),'','kic-g')+
-    kpiCard('👔','职员食材费用','¥'+money(foodZ),'','kic-b')+
-    kpiCard('🧑','员工食材费用','¥'+money(foodY),'','kic-a')+
-    kpiCard('🎯','职员预计人均','¥'+money(predZ),'','kic-b')+
-    kpiCard('🧮','职员实际人均','¥'+money(msZ.perCapita),'','kic-g')+
-    kpiCard('🎯','员工预计人均','¥'+money(predY),'','kic-a')+
-    kpiCard('🧮','员工实际人均','¥'+money(msY.perCapita),'','kic-r')+
+    kpiCard('💴','总食材费用', moneyC(foodAll),'','kic-g')+
+    kpiCard('👔','职员食材费用', moneyC(foodZ),'','kic-b')+
+    kpiCard('🧑','员工食材费用', moneyC(foodY),'','kic-a')+
+    kpiCard('🎯','职员预计人均', moneyC(predZ),'','kic-b')+
+    kpiCard('🧮','职员实际人均', moneyC(msZ.perCapita),'','kic-g')+
+    kpiCard('🎯','员工预计人均', moneyC(predY),'','kic-a')+
+    kpiCard('🧮','员工实际人均', moneyC(msY.perCapita),'','kic-r')+
     kpiCard('⚠️','超预警天数', String(overCount),'','kic-r');
   if(!rows.length){
     $('report-board-chart').innerHTML = '<div class="empty-state"><div class="big">📭</div>该月份暂无数据</div>';
