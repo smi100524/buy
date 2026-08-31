@@ -2322,11 +2322,12 @@ var SYNC_BRANCH = 'main';
 var SYNC_FILE = 'data.json';
 function syncSettings(){
   var s = (state.settings && state.settings.sync) || {};
-  return { token: s.token || '' };
+  return { token: s.token || '', lastUp: s.lastUp || '', lastDown: s.lastDown || '' };
 }
 function setSyncSettings(token){
   state.settings = state.settings || defaultSettings();
-  state.settings.sync = { token: token || '' };
+  var old = state.settings.sync || {};
+  state.settings.sync = { token: token || '', lastUp: old.lastUp || '', lastDown: old.lastDown || '' };
   saveState();
 }
 function b64EncodeUnicode(str){ return btoa(unescape(encodeURIComponent(str))); }
@@ -2347,9 +2348,13 @@ function updateSyncStatus(){
   var el = document.getElementById('sync-status');
   if(!el) return;
   var tok = syncSettings().token;
+  var ss = syncSettings();
+  var parts = [];
+  if(ss.lastUp) parts.push('上次上传 ' + new Date(ss.lastUp).toLocaleString());
+  if(ss.lastDown) parts.push('上次下载 ' + new Date(ss.lastDown).toLocaleString());
   el.textContent = tok
-    ? '已配置令牌。数据保存于 GitHub 仓库 '+SYNC_REPO+' 的 '+SYNC_FILE+'（HTTPS 加密、永久保存）。保存后自动上传，打开时自动下载。'
-    : '未配置令牌：请在下方粘贴 GitHub 访问令牌并保存（每台电脑填一次即可，之后自动免密同步）。';
+    ? '已配置令牌。数据保存于 GitHub 仓库 '+SYNC_REPO+' 的 '+SYNC_FILE+'（HTTPS 加密、永久保存）。保存后自动上传，打开时自动下载。' + (parts.length?(' ｜ '+parts.join('，')):'')
+    : '未配置令牌：请在下方粘贴 GitHub 访问令牌并保存（每台电脑填一次即可）。【重要】每台电脑都必须填令牌并点保存，否则录入的数据只在本机、其他电脑看不到！';
 }
 function downloadFromServer(quiet){
   var url = 'https://raw.githubusercontent.com/'+SYNC_REPO+'/'+SYNC_BRANCH+'/'+SYNC_FILE;
@@ -2362,11 +2367,12 @@ function downloadFromServer(quiet){
     var ss = syncSettings();
     state = d.state;
     state.settings = state.settings || {};
-    state.settings.sync = ss;
+    state.settings.sync = { token: ss.token, lastUp: ss.lastUp, lastDown: new Date().toISOString() };
     saveState();
     rebuildDatalists(); rebuildGroupSelects();
     var ts = d.updatedAt ? new Date(d.updatedAt) : null;
-    if(!quiet) toast('已从线上下载数据'+(ts?('（更新于 '+ts.toLocaleString()+'）'):''));
+    if(!quiet) toast('已从线上下载数据'+(ts?('（线上更新于 '+ts.toLocaleString()+'）'):''));
+    updateSyncStatus();
     return true;
   }).catch(function(e){
     if(!quiet) toast('下载失败：'+e.message,'err');
@@ -2400,15 +2406,19 @@ function uploadToServer(quiet){
     }
     return res;
   }).then(function(){
-    if(!quiet) toast('已上传到线上');
+    var ss = syncSettings();
+    state.settings.sync = { token: ss.token, lastUp: new Date().toISOString(), lastDown: ss.lastDown };
+    saveState();
+    if(!quiet) toast('已上传到线上（其他电脑同步后即可看到）');
+    updateSyncStatus();
     return true;
   }).catch(function(e){
-    if(!quiet) toast('上传失败：'+e.message+'（请确认令牌有效且有仓库权限）','err');
+    if(!quiet) toast('上传失败：'+e.message+'（请检查令牌/网络；数据还在本机，可稍后重试）','err');
     return false;
   });
 }
 function autoSyncOnLoad(){ if(syncSettings().token) downloadFromServer(true); }
-function autoSyncOnSave(){ if(syncSettings().token) uploadToServer(true); }
+function autoSyncOnSave(){ if(syncSettings().token) uploadToServer(false); }
 /* ================= 初始化与事件绑定 ================= */
 function fillYearMonths(){
   var yNow = new Date().getFullYear();
