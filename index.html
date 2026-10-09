@@ -328,8 +328,7 @@ body{font-size:16px}
       </div>
     </div>
     <nav class="nav" id="main-nav">
-      <button data-page="dashboard" class="active"><span class="ic">📊</span>工作台</button>
-      <button data-page="entry"><span class="ic">🛒</span>每日采购表</button>
+      <button data-page="entry" class="active"><span class="ic">🛒</span>每日采购表</button>
       <button data-page="dining"><span class="ic">🍚</span>就餐人数</button>
       <button data-page="board"><span class="ic">📊</span>月度看板</button>
       <button data-page="ingredients"><span class="ic">🥬</span>食材库</button>
@@ -341,28 +340,8 @@ body{font-size:16px}
 </header>
 
 <main>
-  <!-- 工作台 -->
-  <section id="page-dashboard" class="page active">
-    <div id="dash-notice"></div>
-    <div class="kpis" id="dash-kpis"></div>
-    <div class="grid2">
-      <div class="card">
-        <h3><span class="bar"></span>近 7 日采购金额趋势</h3>
-        <div class="chart-box" id="dash-trend"></div>
-      </div>
-      <div class="card">
-        <h3><span class="bar"></span>本月采购类别占比</h3>
-        <div class="chart-box" id="dash-cat"></div>
-      </div>
-    </div>
-    <div class="card">
-      <h3><span class="bar"></span>最近采购记录</h3>
-      <div class="tbl-wrap" id="dash-recent"></div>
-    </div>
-  </section>
-
   <!-- 每日采购表 -->
-  <section id="page-entry" class="page">
+  <section id="page-entry" class="page active">
     <div class="page-title">每日采购表</div>
     <div class="page-sub">按原表格式：选择日期与人员后，顶部为「数据环比」（今日/昨日/对比增减），下方为当日采购明细表。</div>
     <div class="card" style="padding:14px">
@@ -1147,7 +1126,7 @@ function copyTemplate(){
 }
 /* ================= 通用渲染 ================= */
 function $(id){ return document.getElementById(id); }
-var current = { page:'dashboard', entryDate:todayStr(), ledgerY:new Date().getFullYear(), ledgerM:new Date().getMonth()+1, reportY:new Date().getFullYear(), reportM:new Date().getMonth()+1 };
+var current = { page:'entry', entryDate:todayStr(), ledgerY:new Date().getFullYear(), ledgerM:new Date().getMonth()+1, reportY:new Date().getFullYear(), reportM:new Date().getMonth()+1 };
 
 function toast(msg, type){
   var holder = $('toast-holder');
@@ -1458,7 +1437,7 @@ function deleteRecord(date, group){
   state.records = state.records.filter(function(r){ return !(r.date===date && r.group===group); });
   saveState();
   closeModal('day-modal');
-  renderLedger(); renderDashboard();
+  renderLedger();
   toast('已删除该记录');
 }
 
@@ -1767,7 +1746,7 @@ function importJson(file){
       state = { groups:s.groups, settings:Object.assign(defaultSettings(), s.settings||{}), ingredients:s.ingredients, records:s.records };
       saveState();
       rebuildDatalists(); rebuildGroupSelects();
-      switchPage('dashboard');
+      switchPage('entry');
       toast('数据已恢复');
     }catch(e){ toast('导入失败：'+e.message,'err'); }
   };
@@ -1778,7 +1757,7 @@ function resetSample(){
   state = makeSeedState();
   saveState();
   rebuildDatalists(); rebuildGroupSelects();
-  switchPage('dashboard');
+  switchPage('entry');
   toast('已恢复示例数据');
 }
 function clearAll(){
@@ -1786,7 +1765,7 @@ function clearAll(){
   state = { groups:['职员','员工'], settings:defaultSettings(), ingredients:[], records:[] };
   saveState();
   rebuildDatalists(); rebuildGroupSelects();
-  switchPage('dashboard');
+  switchPage('entry');
   toast('数据已清空');
 }
 function downloadBlob(blob, filename, type){
@@ -2520,7 +2499,6 @@ function refreshAllDataViews(){
   if(typeof fillIngCatSelect === 'function') fillIngCatSelect();
   if(typeof rebuildDatalists === 'function') rebuildDatalists();
   if(typeof rebuildGroupSelects === 'function') rebuildGroupSelects();
-  if(typeof renderDashboard === 'function') renderDashboard();
   if(current.page === 'entry' && typeof renderEntry === 'function') renderEntry();
   if(current.page === 'dining' && typeof renderDiningPage === 'function') renderDiningPage();
   if(current.page === 'board' && typeof renderMonthlyBoard === 'function') renderMonthlyBoard();
@@ -2847,7 +2825,7 @@ function init(){
   rebuildDatalists();
   rebuildGroupSelects();
   bindEvents();
-  renderDashboard();
+  switchPage('entry');
   checkLogin();
   autoSyncOnLoad();
 }
