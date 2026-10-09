@@ -831,6 +831,24 @@ function renderDashboard(){
 }
 
 /* ================= 每日采购表（按原表格式） ================= */
+var ENTRY_DRAFT_KEY = 'canteen_entry_drafts_v1';
+var entryDirty = false;
+var entryDraftTimer = null;
+function readEntryDrafts(){ try{ return JSON.parse(localStorage.getItem(ENTRY_DRAFT_KEY)||'{}') || {}; }catch(e){ return {}; } }
+function writeEntryDrafts(map){ try{ localStorage.setItem(ENTRY_DRAFT_KEY, JSON.stringify(map)); }catch(e){} }
+function entryDraftKey(date,group){ return String(date||'')+'|'+String(group||''); }
+function getEntryDraft(date,group){ return readEntryDrafts()[entryDraftKey(date,group)] || null; }
+function clearEntryDraft(date,group){ var map=readEntryDrafts(); delete map[entryDraftKey(date,group)]; writeEntryDrafts(map); }
+function persistEntryDraft(){
+  if(!current || !current.entryDate || !current.entryGroup) return;
+  var people=Number((document.querySelector('#entry-sheet .g-people')||{}).value)||0;
+  var note=((document.querySelector('#entry-sheet .g-note')||{}).value||'').trim();
+  var items=collectItems(); var map=readEntryDrafts(); var key=entryDraftKey(current.entryDate,current.entryGroup);
+  if(items.length || people>0 || note){ map[key]={date:current.entryDate,group:current.entryGroup,people:people,note:note,items:items,updatedAt:new Date().toISOString()}; entryDirty=true; }
+  else { delete map[key]; entryDirty=false; }
+  writeEntryDrafts(map); if(typeof updateSyncStatus==='function') updateSyncStatus();
+}
+function scheduleEntryDraft(){ entryDirty=true; if(entryDraftTimer) clearTimeout(entryDraftTimer); entryDraftTimer=setTimeout(persistEntryDraft,250); }
 function renderEntry(){
   var date = current.entryDate;
   $('entry-date').value = date;
@@ -883,14 +901,21 @@ function renderEntrySheet(){
   html += '</div>';
   sheet.innerHTML = html;
   var itemsBox = sheet.querySelector('.g-items');
-  if(rec && rec.items.length){
-    rec.items.forEach(function(it, idx){ addItemRow(itemsBox, it, idx, date, sum.people); });
-    for(var p=rec.items.length; p<30; p++) addItemRow(itemsBox, null, p, date, sum.people);
+  var draft = getEntryDraft(date, g);
+  if(draft){
+    var draftPeople=sheet.querySelector('.g-people'); if(draftPeople) draftPeople.value=draft.people||'';
+    var draftNote=sheet.querySelector('.g-note'); if(draftNote) draftNote.value=draft.note||'';
+  }
+  var sourceItems = draft ? (draft.items||[]) : (rec ? (rec.items||[]) : []);
+  if(sourceItems.length){
+    sourceItems.forEach(function(it, idx){ addItemRow(itemsBox, it, idx, date, sum.people); });
+    for(var p=sourceItems.length; p<30; p++) addItemRow(itemsBox, null, p, date, sum.people);
   } else {
     for(var i=0;i<30;i++) addItemRow(itemsBox, null, i, date, sum.people);
   }
+  entryDirty = !!draft;
   renumberSheet();
-  sheet.querySelector('.g-add').addEventListener('click', function(){ addItemRow(itemsBox, null, itemsBox.children.length, date, sum.people); renumberSheet(); updateSelectAllState(); updateGroupTotal(); });
+  sheet.querySelector('.g-add').addEventListener('click', function(){ addItemRow(itemsBox, null, itemsBox.children.length, date, sum.people); renumberSheet(); updateSelectAllState(); updateGroupTotal(); scheduleEntryDraft(); });
   var selectAll = sheet.querySelector('.f-select-all');
   if(selectAll) selectAll.addEventListener('change', function(){
     var boxes = sheet.querySelectorAll('.g-items .f-select');
@@ -905,7 +930,8 @@ function renderEntrySheet(){
   sheet.querySelector('.g-del').addEventListener('click', function(){ deleteGroupEntry(); });
   sheet.querySelector('.g-export').addEventListener('click', exportDailyXlsx);
   sheet.querySelector('.g-export-all').addEventListener('click', exportDailyAllXlsx);
-  sheet.querySelector('.g-people').addEventListener('input', updateGroupTotal);
+  sheet.querySelector('.g-people').addEventListener('input', function(){ updateGroupTotal(); scheduleEntryDraft(); });
+  sheet.querySelector('.g-note').addEventListener('input', scheduleEntryDraft);
   updateGroupTotal();
 }
 function buildRowHTML(data, idx){
@@ -936,12 +962,13 @@ function catOptions(selected){
 }
 function bindItemRow(row, container){
   var name = row.querySelector('.f-name');
-  name.addEventListener('change', function(){ fillFromIngredient(row); updateGroupTotal(); });
-  name.addEventListener('input', updateGroupTotal);
-  row.querySelector('.f-qty').addEventListener('input', updateGroupTotal);
-  row.querySelector('.f-cat-in').addEventListener('input', updateGroupTotal);
-  row.querySelector('.f-unit-in').addEventListener('input', updateGroupTotal);
-  row.querySelector('.f-price-in').addEventListener('input', updateGroupTotal);
+  name.addEventListener('change', function(){ fillFromIngredient(row); updateGroupTotal(); scheduleEntryDraft(); });
+  name.addEventListener('input', function(){ updateGroupTotal(); scheduleEntryDraft(); });
+  row.querySelector('.f-qty').addEventListener('input', function(){ updateGroupTotal(); scheduleEntryDraft(); });
+  row.querySelector('.f-cat-in').addEventListener('input', function(){ updateGroupTotal(); scheduleEntryDraft(); });
+  row.querySelector('.f-unit-in').addEventListener('input', function(){ updateGroupTotal(); scheduleEntryDraft(); });
+  row.querySelector('.f-price-in').addEventListener('input', function(){ updateGroupTotal(); scheduleEntryDraft(); });
+  row.querySelector('.f-note').addEventListener('input', scheduleEntryDraft);
   var sel = row.querySelector('.f-select');
   if(sel) sel.addEventListener('change', function(){
     row.classList.toggle('checked', sel.checked);
@@ -957,9 +984,10 @@ function bindItemRow(row, container){
     renumberSheet();
     updateSelectAllState();
     updateGroupTotal();
+    scheduleEntryDraft();
   });
   var del = row.querySelector('.del');
-  if(del) del.addEventListener('click', function(){ row.remove(); renumberSheet(); updateSelectAllState(); updateGroupTotal(); });
+  if(del) del.addEventListener('click', function(){ row.remove(); renumberSheet(); updateSelectAllState(); updateGroupTotal(); scheduleEntryDraft(); });
   row.addEventListener('click', function(){
     var all = document.querySelectorAll('#entry-sheet .item-row.sheet');
     for(var i=0;i<all.length;i++) all[i].classList.remove('sel');
@@ -1063,6 +1091,7 @@ function removeSelectedRows(){
   renumberSheet();
   updateSelectAllState();
   updateGroupTotal();
+  scheduleEntryDraft();
   toast('已删除选中的 '+selected.length+' 行');
 }
 function saveGroupEntry(){
@@ -1080,6 +1109,8 @@ function saveGroupEntry(){
   } else {
     state.records.push({ id:uid('r'), date:date, group:g, people:people, note:note, items:items });
   }
+  clearEntryDraft(date, g);
+  entryDirty=false;
   saveState();
   renderEntry();
   toast('已保存 '+date+' '+g+'（¥'+money(itemsAmount(items))+'）');
@@ -1090,6 +1121,8 @@ function deleteGroupEntry(){
   if(!rec){ toast(g+'：当日暂无记录','err'); return; }
   if(!confirm('确定删除 '+date+' '+g+' 的采购记录（'+rec.items.length+' 项食材）吗？')) return;
   state.records = state.records.filter(function(r){ return !(r.date===date && r.group===g); });
+  clearEntryDraft(date, g);
+  entryDirty=false;
   saveState();
   renderEntry();
   toast('已删除 '+date+' '+g+' 的记录');
@@ -1109,6 +1142,7 @@ function copyTemplate(){
   renumberSheet();
   updateSelectAllState();
   updateGroupTotal();
+  persistEntryDraft();
   toast('已将 '+src+' '+g+' 的 '+srcRec.items.length+' 项菜品复制到 '+dst+'，核对后点保存');
 }
 /* ================= 通用渲染 ================= */
@@ -2664,6 +2698,7 @@ function autoPullFromCloud(quiet){
   if(syncBusy) return Promise.resolve(false);
   syncBusy = true;
   return fetchRemoteState().then(function(remote){
+    if(typeof entryDirty!=='undefined' && entryDirty && current && current.page==='entry'){ syncBusy=false; return false; }
     if(!remote){
       syncBusy = false;
       return uploadToServer(quiet);
