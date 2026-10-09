@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>食堂采购系统 - 旧数据恢复</title>
+<style>
+*{box-sizing:border-box} body{margin:0;background:#eef3ef;color:#1f2937;font-family:"Microsoft YaHei","PingFang SC",sans-serif;font-size:16px}
+.wrap{max-width:820px;margin:30px auto;padding:0 16px}.card{background:#fff;border:1px solid #cfd9d2;border-radius:14px;padding:24px;box-shadow:0 8px 30px rgba(16,24,40,.10)}
+h1{font-size:24px;margin:0 0 8px}.sub{color:#5f6b66;line-height:1.7;margin-bottom:18px}.status{padding:14px 16px;border-radius:10px;background:#eef5f1;border:1px solid #bfe3d1;font-weight:700;margin:14px 0}
+.status.err{background:#fee2e2;border-color:#fca5a5;color:#991b1b}.status.ok{background:#dcfce7;border-color:#86efac;color:#166534}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:16px 0}.kv{background:#f7faf8;border:1px solid #e3ebe6;border-radius:10px;padding:12px}.kv b{display:block;font-size:13px;color:#6b7280;margin-bottom:4px}.kv span{font-size:19px;font-weight:800;color:#16613f}
+button{border:0;border-radius:10px;padding:14px 18px;font-size:16px;font-weight:700;cursor:pointer;margin:6px 8px 6px 0}.primary{background:#1f8a5b;color:#fff}.outline{background:#fff;color:#16613f;border:2px solid #1f8a5b}button:disabled{opacity:.45;cursor:not-allowed}.hint{font-size:14px;color:#6b7280;line-height:1.7;margin-top:14px}
+</style>
+</head>
+<body><div class="wrap"><div class="card">
+<h1>旧数据恢复与合并</h1>
+<div class="sub">请在有旧采购数据的电脑上打开本页面。它只读取本机浏览器保存的数据，不会清除或修改本机原始记录。</div>
+<div id="status" class="status">正在检查本机数据...</div>
+<div id="stats" class="stats" style="display:none"></div>
+<div id="actions" style="display:none">
+  <button id="export" class="outline">下载本机原始备份</button>
+  <button id="merge" class="primary">合并上传到云端</button>
+</div>
+<div id="result" class="hint"></div>
+<div class="hint">说明：如果本机数据显示的最新日期只有 2026-06-30，说明这台电脑没有后来录入的数据；如果显示 2026-09 或更晚，请点“合并上传到云端”。</div>
+</div></div>
+<script>
+const KEY='canteen_purchase_system_v1';
+const SUPABASE_URL='https://lyjvwogbnnithedromac.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5anZ3b2dibm5pdGhlZHJvbWFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxOTg3MTcsImV4cCI6MjEwMjc3NDcxN30.4_8pc4QORNsjO84gmjBvWGKpbg9AaT_z9nbRemBGyFU';
+let localState=null;
+const $=id=>document.getElementById(id);
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function recKey(r){return String(r&&r.date||'')+'|'+String(r&&r.group||'')}
+function recScore(r){return ((r&&r.items||[]).length*100000)+((Number(r&&r.people)||0)*10)+String(r&&r.note||'').length}
+function clone(x){return JSON.parse(JSON.stringify(x))}
+function mergeStates(local,remote){
+  const out=clone(remote||{}); out.groups=Array.isArray(out.groups)?out.groups:[]; out.ingredients=Array.isArray(out.ingredients)?out.ingredients:[]; out.records=Array.isArray(out.records)?out.records:[]; out.settings=out.settings||{};
+  let changed=false;
+  (local.groups||[]).forEach(g=>{if(out.groups.indexOf(g)<0){out.groups.push(g);changed=true}});
+  const im={}; out.ingredients.forEach(x=>{const k=String(x&&(x.id||x.name)||'');if(k)im[k]=x});
+  (local.ingredients||[]).forEach(x=>{const k=String(x&&(x.id||x.name)||'');if(k&&!im[k]){out.ingredients.push(clone(x));im[k]=x;changed=true}});
+  const rm={}; out.records.forEach(r=>{const k=recKey(r);if(k!=='|')rm[k]=r});
+  (local.records||[]).forEach(r=>{const k=recKey(r);if(k==='|')return;if(!rm[k]){out.records.push(clone(r));rm[k]=r;changed=true}else if(recScore(r)>recScore(rm[k])){const i=out.records.indexOf(rm[k]);if(i>=0)out.records[i]=clone(r);rm[k]=r;changed=true}});
+  const rd=out.dining||{}; rd.days=rd.days||{}; const ld=local.dining||{};
+  Object.keys(ld.days||{}).forEach(date=>{const src=ld.days[date]||{};const dst=rd.days[date]||{};rd.days[date]=dst;Object.keys(src).forEach(g=>{const a=dst[g]||{},b=src[g]||{};if(!dst[g]||(Number(b.total)||0)>(Number(a.total)||0)){dst[g]=clone(b);changed=true}})});
+  out.dining=rd; return {state:out,changed};
+}
+function showLocal(){
+  let raw=''; try{raw=localStorage.getItem(KEY)||''}catch(e){}
+  if(!raw){$('status').className='status err';$('status').textContent='没有检测到本机旧数据。请不要清除浏览器数据。';return}
+  try{localState=JSON.parse(raw)}catch(e){$('status').className='status err';$('status').textContent='本机数据格式无法读取：'+e.message;return}
+  const recs=Array.isArray(localState.records)?localState.records:[];
+  const dates=recs.map(r=>String(r.date||'')).filter(Boolean).sort();
+  $('status').className='status ok';$('status').textContent='检测到本机数据，可以导出或合并上传。';
+  $('stats').style.display='grid';
+  $('stats').innerHTML='<div class="kv"><b>本机记录数</b><span>'+recs.length+' 条</span></div><div class="kv"><b>最早日期</b><span>'+(dates[0]||'—')+'</span></div><div class="kv"><b>最新日期</b><span>'+(dates[dates.length-1]||'—')+'</span></div><div class="kv"><b>最近日期</b><span style="font-size:14px">'+esc(dates.slice(-8).join('、')||'—')+'</span></div>';
+  $('actions').style.display='block'; $('result').textContent='';
+}
+function download(){
+  const blob=new Blob([JSON.stringify(localState,null,2)],{type:'application/json;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='食堂采购系统-本机原始数据-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+async function request(url,opt){const r=await fetch(url,opt);if(!r.ok)throw new Error('HTTP '+r.status);return r}
+async function mergeUpload(){
+  const btn=$('merge');btn.disabled=true;btn.textContent='正在合并上传...';
+  try{
+    const get=await request(SUPABASE_URL+'/rest/v1/sync_data?select=data,updated_at&id=eq.1',{headers:{apikey:SUPABASE_ANON,Authorization:'Bearer '+SUPABASE_ANON,Accept:'application/json'},cache:'no-store'});
+    const rows=await get.json(); const remote=rows&&rows[0]&&rows[0].data; const base=(remote&&Array.isArray(remote.records))?remote:localState;
+    const m=mergeStates(localState,base); const now=new Date().toISOString(); m.state.settings=m.state.settings||{}; m.state.settings.sync=m.state.settings.sync||{}; m.state.settings.sync.revision=now; m.state.settings.sync.lastCloudAt=now;
+    const body=JSON.stringify({data:m.state,updated_at:now});
+    await request(SUPABASE_URL+'/rest/v1/sync_data?id=eq.1',{method:'PATCH',headers:{apikey:SUPABASE_ANON,Authorization:'Bearer '+SUPABASE_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},body});
+    $('status').className='status ok';$('status').textContent='合并上传成功，其他电脑稍后会自动同步。';$('result').textContent='云端现有 '+m.state.records.length+' 条采购记录。';
+  }catch(e){$('status').className='status err';$('status').textContent='合并上传失败：'+e.message;$('result').textContent='本机原始数据没有被修改，可先点“下载本机原始备份”。'}
+  btn.disabled=false;btn.textContent='合并上传到云端';
+}
+$('export').onclick=download; $('merge').onclick=mergeUpload; showLocal();
+</script>
+</body></html>
