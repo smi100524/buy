@@ -579,6 +579,7 @@ function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMo
 function pad2(n){ return String(n).padStart(2,'0'); }
 function monthDays(y,m){ return new Date(y,m,0).getDate(); }
 
+var HAS_SAVED_LOCAL_STATE = false;
 var state = loadState();
 var DEFAULT_PASS_HASH = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92';
 function defaultStandards(){
@@ -652,6 +653,7 @@ function loadState(){
   try{
     var raw = localStorage.getItem(STORAGE_KEY);
     if(raw){ var s = JSON.parse(raw); if(s && Array.isArray(s.ingredients) && Array.isArray(s.records) && Array.isArray(s.groups)) {
+      HAS_SAVED_LOCAL_STATE = true;
       if(!s.dining) s.dining = clone(SEED_DINING);
       if(s.settings && s.settings.standards){ /* 已是新版 */ if(!s.settings.passHash) s.settings.passHash = DEFAULT_PASS_HASH; }
       else if(s.settings && s.settings.expectCond!=null){
@@ -2600,6 +2602,64 @@ function fetchRemoteState(){
     return { state:row.data, updatedAt:row.updated_at || '' };
   });
 }
+function syncRecordKey(r){ return String((r&&r.date)||'')+'|'+String((r&&r.group)||''); }
+function syncRecordScore(r){
+  r = r || {};
+  return ((r.items||[]).length * 100000) + ((Number(r.people)||0) * 10) + ((r.note||'').length);
+}
+function mergeLegacyLocalState(localState, remoteState){
+  var merged = clone(remoteState || {});
+  merged.groups = Array.isArray(merged.groups) ? merged.groups : [];
+  merged.ingredients = Array.isArray(merged.ingredients) ? merged.ingredients : [];
+  merged.records = Array.isArray(merged.records) ? merged.records : [];
+  merged.settings = merged.settings || {};
+  var changed = false;
+
+  (localState.groups || []).forEach(function(g){
+    if(merged.groups.indexOf(g) < 0){ merged.groups.push(g); changed = true; }
+  });
+
+  var ingMap = {};
+  merged.ingredients.forEach(function(it){
+    var k = String((it && (it.id || it.name)) || '');
+    if(k) ingMap[k] = it;
+  });
+  (localState.ingredients || []).forEach(function(it){
+    var k = String((it && (it.id || it.name)) || '');
+    if(k && !ingMap[k]){ merged.ingredients.push(clone(it)); ingMap[k] = it; changed = true; }
+  });
+
+  var recMap = {};
+  merged.records.forEach(function(r){ var k = syncRecordKey(r); if(k !== '|') recMap[k] = r; });
+  (localState.records || []).forEach(function(r){
+    var k = syncRecordKey(r);
+    if(k === '|') return;
+    var cur = recMap[k];
+    if(!cur){ merged.records.push(clone(r)); recMap[k] = r; changed = true; }
+    else if(syncRecordScore(r) > syncRecordScore(cur)){
+      var idx = merged.records.indexOf(cur);
+      if(idx >= 0) merged.records[idx] = clone(r);
+      recMap[k] = r; changed = true;
+    }
+  });
+
+  var remoteDining = merged.dining || {};
+  var localDining = localState.dining || {};
+  remoteDining.days = remoteDining.days || {};
+  Object.keys(localDining.days || {}).forEach(function(date){
+    var src = localDining.days[date] || {};
+    var dst = remoteDining.days[date] || {};
+    remoteDining.days[date] = dst;
+    Object.keys(src).forEach(function(group){
+      var a = dst[group] || {}, b = src[group] || {};
+      if(!dst[group] || (Number(b.total)||0) > (Number(a.total)||0)){
+        dst[group] = clone(b); changed = true;
+      }
+    });
+  });
+  merged.dining = remoteDining;
+  return { state:merged, changed:changed };
+}
 function autoPullFromCloud(quiet){
   if(syncBusy) return Promise.resolve(false);
   syncBusy = true;
@@ -2610,6 +2670,25 @@ function autoPullFromCloud(quiet){
     }
     var remoteAt = Date.parse(remote.updatedAt) || 0;
     var localAt = Date.parse(syncSettings().revision) || 0;
+    if(HAS_SAVED_LOCAL_STATE && !localAt){
+      var mergeResult = mergeLegacyLocalState(state, remote.state);
+      if(mergeResult.changed){
+        var now = new Date().toISOString();
+        state = mergeResult.state;
+        state.settings = state.settings || {};
+        state.settings.sync = state.settings.sync || {};
+        state.settings.sync.revision = now;
+        state.settings.sync.lastCloudAt = remote.updatedAt || now;
+        syncDirty = true;
+        saveState(true);
+        refreshAllDataViews();
+        syncBusy = false;
+        return uploadToServer(true).then(function(ok){
+          if(ok) toast('已把本机原有采购数据自动合并到云端');
+          return true;
+        });
+      }
+    }
     if(syncDirty && localAt > remoteAt){
       syncBusy = false;
       return uploadToServer(quiet);
