@@ -2498,7 +2498,7 @@ function downloadFromServer(quiet){
       if(!r.ok) throw new Error('HTTP '+r.status);
       return r.json();
     }).then(function(d){
-      if(!d || !d.state){ if(!quiet) toast('服务器数据格式异常','err'); return false; }
+      if(!d || !d.state || !isUsableSyncState(d.state)){ if(!quiet) toast('服务器暂无有效数据','err'); return false; }
       applyDownloadedState(d.state, d.updatedAt, quiet);
       return true;
     }).catch(function(e){
@@ -2512,7 +2512,7 @@ function downloadFromServer(quiet){
     return r.json();
   }).then(function(list){
     var row = list && list[0];
-    if(!row || !row.data){ if(!quiet) toast('云端暂无数据，请先在「上传数据」上传一次','err'); return false; }
+    if(!row || !isUsableSyncState(row.data)){ if(!quiet) toast('云端暂无有效数据','err'); return false; }
     applyDownloadedState(row.data, row.updated_at, quiet);
     return true;
   }).catch(function(e){
@@ -2576,6 +2576,9 @@ function markUploaded(quiet){
   if(!quiet) toast('已自动上传到云端');
   updateSyncStatus();
 }
+function isUsableSyncState(d){
+  return !!(d && Array.isArray(d.groups) && Array.isArray(d.ingredients) && Array.isArray(d.records));
+}
 function fetchRemoteState(){
   if(syncMode()==='server'){
     return fetch(location.origin + '/api/data', { cache:'no-store' }).then(function(r){
@@ -2593,7 +2596,7 @@ function fetchRemoteState(){
     return r.json();
   }).then(function(list){
     var row = list && list[0];
-    if(!row || !row.data) return null;
+    if(!row || !isUsableSyncState(row.data)) return null;
     return { state:row.data, updatedAt:row.updated_at || '' };
   });
 }
@@ -2602,9 +2605,8 @@ function autoPullFromCloud(quiet){
   syncBusy = true;
   return fetchRemoteState().then(function(remote){
     if(!remote){
-      if(!quiet && syncDirty){ syncBusy=false; return uploadToServer(quiet); }
       syncBusy = false;
-      return false;
+      return uploadToServer(quiet);
     }
     var remoteAt = Date.parse(remote.updatedAt) || 0;
     var localAt = Date.parse(syncSettings().revision) || 0;
