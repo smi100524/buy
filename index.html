@@ -647,21 +647,14 @@ function loadState(){
   return makeSeedState();
 }
 function makeSeedState(){ return { groups:['职员','员工'], settings:defaultSettings(), dining:clone(SEED_DINING), ingredients:clone(SEED_INGREDIENTS), records:clone(SEED_RECORDS) }; }
-function diningUniquePeople(date, group){
-  if(typeof diningFor !== 'function') return 0;
-  var d = diningFor(date, group);
-  if(!d) return 0;
-  var lunch = Number(d.lunch)||0, dinner = Number(d.dinner)||0;
-  return Math.max(lunch, dinner) || Number(d.total) || 0;
-}
 function dayPredict(date, group){
   if(group==='全部'){
     var recs = state.records.filter(function(r){ return r.date===date; });
     var num=0, den=0;
     recs.forEach(function(r){
-      var ds = daySummary(date, r.group);
-      var p = ds.perPeople || Number(r.people) || 0;
+      var p = Number(r.people)||0;
       if(p<=0) return;
+      var ds = daySummary(date, r.group);
       num += (ds.perFood + stdCond(r.group) + stdGrain(r.group)) * p;
       den += p;
     });
@@ -677,15 +670,15 @@ function monthPredict(year, month, group){
     recs.forEach(function(r){
       if(seen[r.group]) return; seen[r.group]=1;
       var ms = monthSummary(year, month, r.group);
-      if(ms.perPeople<=0) return;
-      num += (r2(ms.total-ms.cond-ms.grain)/ms.perPeople + stdCond(r.group) + stdGrain(r.group)) * ms.perPeople;
-      den += ms.perPeople;
+      if(ms.people<=0) return;
+      num += (r2(ms.total-ms.cond-ms.grain)/ms.people + stdCond(r.group) + stdGrain(r.group)) * ms.people;
+      den += ms.people;
     });
     return den>0 ? r2(num/den) : 0;
   }
   var ms = monthSummary(year, month, group);
-  if(ms.perPeople<=0) return 0;
-  return r2(r2(ms.total-ms.cond-ms.grain)/ms.perPeople + stdCond(group) + stdGrain(group));
+  if(ms.people<=0) return 0;
+  return r2(r2(ms.total-ms.cond-ms.grain)/ms.people + stdCond(group) + stdGrain(group));
 }
 function saveState(noAutoSync){
   try{
@@ -708,19 +701,17 @@ function catType(cat){ if(cat==='调料品') return '调味料'; if(cat==='油�
 function daySummary(date, group){
   var recs = state.records.filter(function(r){ return r.date===date && (group==='全部'||r.group===group); });
   var people = recs.reduce(function(s,r){ return s+(Number(r.people)||0); },0);
-  var perPeople = diningUniquePeople(date, group);
-  if(perPeople<=0) perPeople = people;
   var items = [];
   recs.forEach(function(r){ items = items.concat(r.items||[]); });
   var total = itemsAmount(items);
   var cond = r2(items.filter(function(it){ return it.category==='调料品'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
   var grain = r2(items.filter(function(it){ return it.category==='油类'||it.category==='米面类'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
   var food = r2(total-cond-grain);
-  var perCapita = perPeople>0 ? r2(total/perPeople) : 0;
-  var perFood = perPeople>0 ? r2(food/perPeople) : 0;
-  var perCond = perPeople>0 ? r2(cond/perPeople) : 0;
-  var perGrain = perPeople>0 ? r2(grain/perPeople) : 0;
-  return { recs:recs, people:people, perPeople:perPeople, total:total, cond:cond, grain:grain, food:food, perCapita:perCapita, perFood:perFood, perCond:perCond, perGrain:perGrain };
+  var perCapita = people>0 ? r2(total/people) : 0;
+  var perFood = people>0 ? r2(food/people) : 0;
+  var perCond = people>0 ? r2(cond/people) : 0;
+  var perGrain = people>0 ? r2(grain/people) : 0;
+  return { recs:recs, people:people, total:total, cond:cond, grain:grain, food:food, perCapita:perCapita, perFood:perFood, perCond:perCond, perGrain:perGrain };
 }
 function pcText(v, people){ return people>0 ? '¥'+money(v) : '—'; }
 
@@ -740,14 +731,6 @@ function monthRecs(year, month, group){
 function monthSummary(year, month, group){
   var recs = monthRecs(year, month, group);
   var people = recs.reduce(function(s,r){ return s+(Number(r.people)||0); },0);
-  var perPeople = 0, seenPeople = {};
-  recs.forEach(function(r){
-    var k = r.date+'|'+r.group;
-    if(seenPeople[k]) return; seenPeople[k]=1;
-    var u = diningUniquePeople(r.date, r.group);
-    perPeople += u>0 ? u : (Number(r.people)||0);
-  });
-  if(perPeople<=0) perPeople = people;
   var items = [];
   recs.forEach(function(r){ items = items.concat(r.items||[]); });
   var total = itemsAmount(items);
@@ -755,8 +738,8 @@ function monthSummary(year, month, group){
   items.forEach(function(it){ var c=it.category||'未分类'; byCat[c]=(byCat[c]||0)+(Number(it.qty)||0)*(Number(it.price)||0); });
   var cond = r2(items.filter(function(it){ return it.category==='调料品'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
   var grain = r2(items.filter(function(it){ return it.category==='油类'||it.category==='米面类'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
-  var perCapita = perPeople>0 ? r2(total/perPeople) : 0;
-  return { recs:recs, people:people, perPeople:perPeople, total:total, cond:cond, grain:grain, byCat:byCat, perCapita:perCapita };
+  var perCapita = people>0 ? r2(total/people) : 0;
+  return { recs:recs, people:people, total:total, cond:cond, grain:grain, byCat:byCat, perCapita:perCapita };
 }
 function monthRecsPrev(year, month){ var d=new Date(year, month-2, 1); return { y:d.getFullYear(), m:d.getMonth()+1 }; }
 /* ================= 工作台 ================= */
@@ -1579,10 +1562,10 @@ function renderMonthlyBoard(){
   function renderGroupTable(elId, gRows){
     var el = $(elId);
     if(!gRows.length){ el.innerHTML = '<div class="empty-state">该月暂无数据</div>'; return; }
-    el.innerHTML = '<table class="tbl"><thead><tr><th>日期</th><th class="num">实际人数</th><th class="num">实际人均(元)</th><th class="num">预测人均(元)</th><th class="num">差额(实际-预测)</th><th class="center">预警</th></tr></thead><tbody>'+
+    el.innerHTML = '<table class="tbl"><thead><tr><th>日期</th><th class="num">就餐人次</th><th class="num">实际人均(元)</th><th class="num">预测人均(元)</th><th class="num">差额(实际-预测)</th><th class="center">预警</th></tr></thead><tbody>'+
       gRows.map(function(r){
-        var unique = diningUniquePeople(r.ds, r.g);
-        var peopleTxt = unique ? (unique+' <span style="font-size:11px;color:var(--primary)">人数</span>') : r.people;
+        var din = diningFor(r.ds, r.g);
+        var peopleTxt = din ? (din.total+' <span style="font-size:11px;color:var(--primary)">看板</span>') : r.people;
         var diff = (r.act!=null && r.pred!=null) ? r2(r.act - r.pred) : null;
         var wk = r.over ? '<span class="tag" style="background:var(--danger-light);color:var(--danger);font-weight:600">⚠️ 超预警</span>' : '<span class="tag tag-empty">正常</span>';
         return '<tr><td>'+r.ds+'</td><td class="num">'+peopleTxt+'</td><td class="num" style="font-weight:600">'+(r.act!=null?'¥'+money(r.act):'—')+'</td><td class="num">'+(r.pred!=null?'¥'+money(r.pred):'—')+'</td><td class="num">'+(diff!=null?fmtDiff(diff,''):'—')+'</td><td class="center">'+wk+'</td></tr>';
