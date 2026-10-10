@@ -408,7 +408,7 @@ body{font-size:16px}
           <div class="tbl-wrap" id="report-board-table-y"></div>
         </div>
       </div>
-      <div class="hint" style="margin-top:8px">实际人均超过预警线（职员 12 元 / 员工 6 元，可在系统设置调整）的天数会标记 ⚠️ 超预警。</div>
+      <div class="hint" style="margin-top:8px">当日人均超过预警线（职员 12 元 / 员工 6 元，可在系统设置调整）的天数会标记 ⚠️ 超预警。</div>
     </div>
   </section>
 
@@ -1393,11 +1393,11 @@ function openDayModal(date, group){
   var html = '<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:14px">'+
     kpiCard('👥','就餐人次', String(sum.people),'','kic-b')+
     kpiCard('💴','采购金额','¥'+money(sum.total), fmtDiff(sum.total-prev.total,'元'),'kic-g')+
-    kpiCard('🧮','实际人均','¥'+money(sum.perCapita), '预测 ¥'+money(predAll)+' · '+fmtDiff(sum.perCapita-predAll,'元'),'kic-a')+
+    kpiCard('🧮','当日人均','¥'+money(sum.perCapita), '预测 ¥'+money(predAll)+' · '+fmtDiff(sum.perCapita-predAll,'元'),'kic-a')+
     kpiCard('🥬','食材/调味/粮油','¥'+money(sum.food)+' / ¥'+money(sum.cond)+' / ¥'+money(sum.grain),'','kic-r')+'</div>';
   html += '<div class="tbl-wrap" style="margin-bottom:14px"><table class="tbl"><thead><tr><th>指标</th><th class="num">就餐人次</th><th class="num">食材费用</th><th class="num">调味料</th><th class="num">粮油</th><th class="num">当日合计</th></tr></thead><tbody>'+
     '<tr><td>金额(元)</td><td class="num">'+sum.people+'</td><td class="num">¥'+money(sum.food)+'</td><td class="num">¥'+money(sum.cond)+'</td><td class="num">¥'+money(sum.grain)+'</td><td class="num" style="font-weight:700">¥'+money(sum.total)+'</td></tr>'+
-    '<tr><td>实际人均(元)</td><td class="num">—</td><td class="num">'+pcText(sum.perFood, sum.people)+'</td><td class="num">'+pcText(sum.perCond, sum.people)+'</td><td class="num">'+pcText(sum.perGrain, sum.people)+'</td><td class="num" style="font-weight:700">'+pcText(sum.perCapita, sum.people)+'</td></tr>'+
+    '<tr><td>当日人均(元)</td><td class="num">—</td><td class="num">'+pcText(sum.perFood, sum.people)+'</td><td class="num">'+pcText(sum.perCond, sum.people)+'</td><td class="num">'+pcText(sum.perGrain, sum.people)+'</td><td class="num" style="font-weight:700">'+pcText(sum.perCapita, sum.people)+'</td></tr>'+
     '<tr><td>预测人均(元)</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num" style="font-weight:700">¥'+money(predAll)+'</td></tr>'+
     '</tbody></table><div class="hint">预测人均 = 实际食材人均 + 预计调味料 + 预计粮油；预计标准按人员分组设置，见下方各分组。</div></div>';
   if(!grouped.length){ html += '<div class="empty-state"><div class="big">📭</div>当日暂无记录</div>'; }
@@ -1407,7 +1407,7 @@ function openDayModal(date, group){
     html += '<div style="display:flex;align-items:center;gap:10px;margin:10px 0 4px;flex-wrap:wrap">'+
       '<span class="tag tag-grp">'+esc(rec.group)+'</span>'+
       '<span style="font-size:13px;color:var(--muted)">'+rec.people+' 人次</span>'+
-      '<span style="font-size:13px;font-weight:600">实际人均 ¥'+money(gSum.perCapita)+'</span>'+(isOverWarn(rec.group, gSum.perCapita)?'<span class="tag" style="background:var(--danger-light);color:var(--danger);font-weight:600">⚠️ 超预警</span>':'')+
+      '<span style="font-size:13px;font-weight:600">当日人均 ¥'+money(gSum.perCapita)+'</span>'+(isOverWarn(rec.group, gSum.perCapita)?'<span class="tag" style="background:var(--danger-light);color:var(--danger);font-weight:600">⚠️ 超预警</span>':'')+
       '<span style="font-size:13px;color:var(--muted)">预测人均 ¥'+money(gPred)+'</span>'+
       '<span style="font-size:13px;color:var(--muted)">'+esc(rec.note||'')+'</span>'+
       '<span style="margin-left:auto;font-weight:700;color:var(--primary-dark)">¥'+money(itemsAmount(rec.items))+'</span>'+
@@ -1553,16 +1553,16 @@ function renderMonthlyBoard(){
     kpiCard('👔','职员食材费用', moneyC(foodZ),'','kic-b')+
     kpiCard('🧑','员工食材费用', moneyC(foodY),'','kic-a')+
     kpiCard('🎯','职员预计人均', moneyC(predZ),'','kic-b')+
-    kpiCard('🧮','职员实际人均', moneyC(msZ.perCapita),'','kic-g')+
+    kpiCard('🧮','职员当日人均', moneyC(msZ.perCapita),'','kic-g')+
     kpiCard('🎯','员工预计人均', moneyC(predY),'','kic-a')+
-    kpiCard('🧮','员工实际人均', moneyC(msY.perCapita),'','kic-r')+
+    kpiCard('🧮','员工当日人均', moneyC(msY.perCapita),'','kic-r')+
     kpiCard('⚠️','职员超预警天数', String(overZ)+' 天','','kic-r')+
     kpiCard('⚠️','员工超预警天数', String(overY)+' 天','','kic-r');
 
   function renderGroupTable(elId, gRows){
     var el = $(elId);
     if(!gRows.length){ el.innerHTML = '<div class="empty-state">该月暂无数据</div>'; return; }
-    el.innerHTML = '<table class="tbl"><thead><tr><th>日期</th><th class="num">就餐人次</th><th class="num">实际人均(元)</th><th class="num">预测人均(元)</th><th class="num">差额(实际-预测)</th><th class="center">预警</th></tr></thead><tbody>'+
+    el.innerHTML = '<table class="tbl"><thead><tr><th>日期</th><th class="num">就餐人次</th><th class="num">当日人均(元)</th><th class="num">预测人均(元)</th><th class="num">差额(实际-预测)</th><th class="center">预警</th></tr></thead><tbody>'+
       gRows.map(function(r){
         var din = diningFor(r.ds, r.g);
         var peopleTxt = din ? (din.total+' <span style="font-size:11px;color:var(--primary)">看板</span>') : r.people;
@@ -1578,8 +1578,8 @@ function renderMonthlyBoard(){
     renderGroupTable('report-board-table-y', []);
     return;
   }
-  dualLineChart('report-board-chart-z', labels, actZ, predZArr, {colorA:'#2563eb', colorB:'#f59e0b', nameA:'实际人均', nameB:'预测人均'});
-  dualLineChart('report-board-chart-y', labels, actY, predYArr, {colorA:'#2563eb', colorB:'#f59e0b', nameA:'实际人均', nameB:'预测人均'});
+  dualLineChart('report-board-chart-z', labels, actZ, predZArr, {colorA:'#2563eb', colorB:'#f59e0b', nameA:'当日人均', nameB:'预测人均'});
+  dualLineChart('report-board-chart-y', labels, actY, predYArr, {colorA:'#2563eb', colorB:'#f59e0b', nameA:'当日人均', nameB:'预测人均'});
   renderGroupTable('report-board-table-z', rows.filter(function(r){ return r.g==='职员'; }));
   renderGroupTable('report-board-table-y', rows.filter(function(r){ return r.g==='员工'; }));
 }
@@ -2040,7 +2040,7 @@ function buildAllSheets(){
   sheets.push({name:'月度汇总', rows:monRows});
 
   // 4. 每日汇总
-  var dayRows = [[HDR('日期'),HDR('人员'),HDR('就餐人次'),HDR('采购金额'),HDR('人均食材费用'),HDR('预计人均调味料'),HDR('实际人均调味料'),HDR('预计人均粮油'),HDR('实际人均粮油'),HDR('当日人均'),HDR('预测人均'),HDR('金额环比'),HDR('人均环比')]];
+  var dayRows = [[HDR('日期'),HDR('人员'),HDR('就餐人次'),HDR('采购金额'),HDR('人均食材费用'),HDR('预计人均调味料'),HDR('当日人均调味料'),HDR('预计人均粮油'),HDR('当日人均粮油'),HDR('当日人均'),HDR('预测人均'),HDR('金额环比'),HDR('人均环比')]];
   var dayGroups = {};
   state.records.forEach(function(rec){ var k=rec.date; dayGroups[k]=dayGroups[k]||[]; dayGroups[k].push(rec); });
   var lastByG = {};
@@ -2064,7 +2064,7 @@ function buildMonthSheet(y,m,group){
   var days = monthDays(y,m);
 
   // 1. 每日汇总（按 日期×人员 逐行，环比按同组上日）
-  var rows = [[HDR('日期'),HDR('人员'),HDR('星期'),HDR('就餐人次'),HDR('采购金额'),HDR('食材费用'),HDR('调味料'),HDR('粮油'),HDR('人均食材'),HDR('预计人均调味料'),HDR('实际人均调味料'),HDR('预计人均粮油'),HDR('实际人均粮油'),HDR('当日人均'),HDR('预测人均'),HDR('金额环比'),HDR('人均环比')]];
+  var rows = [[HDR('日期'),HDR('人员'),HDR('星期'),HDR('就餐人次'),HDR('采购金额'),HDR('食材费用'),HDR('调味料'),HDR('粮油'),HDR('人均食材'),HDR('预计人均调味料'),HDR('当日人均调味料'),HDR('预计人均粮油'),HDR('当日人均粮油'),HDR('当日人均'),HDR('预测人均'),HDR('金额环比'),HDR('人均环比')]];
   var lastBy = {};
   for(var d=1;d<=days;d++){
     var ds = y+'-'+pad2(m)+'-'+pad2(d);
