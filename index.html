@@ -1145,7 +1145,7 @@ function switchPage(name){
   current.page = name;
   if(name==='dashboard') renderDashboard();
   else if(name==='entry') renderEntry();
-  else if(name==='dining') renderDining();
+  else if(name==='dining'){ renderDining(); if(syncMode()==='server') autoDiningOnLoad(); }
   else if(name==='board') renderMonthlyBoard();
   else if(name==='ingredients') renderIngredients();
   else if(name==='settings') renderSettings();
@@ -2409,6 +2409,7 @@ function diningPasteText(){
 }
 
 function autoDiningOnLoad(){
+  if(syncMode()!=='server') return;
   var dd = diningData();
   if(!dd || !dd.url) return;
   var url = dd.url.replace(/\/+$/,'');
@@ -2828,6 +2829,11 @@ function init(){
   switchPage('entry');
   checkLogin();
   autoSyncOnLoad();
+  if(syncMode()==='server'){
+    autoDiningOnLoad();
+    window.addEventListener('focus', autoDiningOnLoad);
+    document.addEventListener('visibilitychange', function(){ if(!document.hidden) autoDiningOnLoad(); });
+  }
 }
 init();
 </script>
