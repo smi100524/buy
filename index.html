@@ -2139,14 +2139,19 @@ function buildDailySheet(date, group){
     {v:'数量', s:5}, {v:'单价', s:5}, {v:'单项金额', s:5}, {v:'规格/型号', s:5}, {v:'备注', s:5}
   ]);
   var items = rec ? rec.items : [];
+  var total = 0;
   items.forEach(function(it, i){
+    var amt = r2((Number(it.qty)||0)*(Number(it.price)||0));
+    total = r2(total + amt);
     rows.push([
       {v:i+1, s:6}, {v:it.name, s:6}, {v:it.category||'', s:6}, {v:it.unit||'', s:6},
-      {v:Number(it.qty)||0, s:6}, {v:Number(it.price)||0, s:2}, {v:r2(it.qty*it.price), s:2},
+      {v:Number(it.qty)||0, s:6}, {v:Number(it.price)||0, s:2}, {v:amt, s:2},
       {v:it.spec||'', s:6}, {v:it.note||'', s:6}
     ]);
   });
-  return [{ name: group, rows: rows, mergeCells:['A1:I1'], colWidths:[15.1,17.1,16.5,11.6,10,9.7,11,19.1,17.4] }];
+  var totalRow = items.length + 3;
+  rows.push([{v:'合计', s:1}, {v:'', s:1}, {v:'', s:1}, {v:'', s:1}, {v:'', s:1}, {v:'', s:1}, {v:total, s:2}, {v:'', s:1}, {v:'', s:1}]);
+  return [{ name: group, rows: rows, mergeCells:['A1:I1','A'+totalRow+':F'+totalRow], colWidths:[15.1,17.1,16.5,11.6,10,9.7,11,19.1,17.4] }];
 }
 
 function buildDailyAll(date){
