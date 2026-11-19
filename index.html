@@ -384,10 +384,13 @@ body{font-size:16px}
       <div class="range-bar">
         <div class="field"><label>年份</label><select id="report-year"></select></div>
         <div class="field"><label>月份</label><select id="report-month"></select></div>
+        <div class="field"><label>统计开始</label><input type="date" id="report-start"></div>
+        <div class="field"><label>统计截止</label><input type="date" id="report-end"></div>
         <button class="btn btn-outline" id="btn-export-month">导出本月 Excel</button>
         <button class="btn btn-outline" id="btn-export-all">导出全部 Excel</button>
       </div>
       <div class="kpis" id="report-board-kpis" style="grid-template-columns:repeat(auto-fit,minmax(215px,1fr));margin:14px 0 12px"></div>
+      <div class="hint" id="report-range-info" style="margin:-2px 0 10px"></div>
       <div class="grid2" style="margin-top:8px">
         <div>
           <div style="font-size:15px;font-weight:600;margin-bottom:6px">👔 职员 · 每日预实对比</div>
@@ -8332,20 +8335,20 @@ function dayPredict(date, group){
   if(ds.people<=0) return 0;
   return r2(predictFoodCost(ds, group)/ds.people + stdCond(group) + stdGrain(group));
 }
-function monthPredict(year, month, group){
+function monthPredict(year, month, group, startDate, endDate){
   if(group==='全部'){
-    var recs = monthRecs(year, month, group);
+    var recs = monthRecs(year, month, group, startDate, endDate);
     var num=0, den=0, seen={};
     recs.forEach(function(r){
       if(seen[r.group]) return; seen[r.group]=1;
-      var ms = monthSummary(year, month, r.group);
+      var ms = monthSummary(year, month, r.group, startDate, endDate);
       if(ms.people<=0) return;
       num += (predictFoodCost(ms, r.group)/ms.people + stdCond(r.group) + stdGrain(r.group)) * ms.people;
       den += ms.people;
     });
     return den>0 ? r2(num/den) : 0;
   }
-  var ms = monthSummary(year, month, group);
+  var ms = monthSummary(year, month, group, startDate, endDate);
   if(ms.people<=0) return 0;
   return r2(predictFoodCost(ms, group)/ms.people + stdCond(group) + stdGrain(group));
 }
@@ -8403,12 +8406,16 @@ function cmpTwo(dayA, dayB, group){
   return { totalDiff:r2(a.total-b.total), perDiff:r2(a.perCapita-b.perCapita), peopleDiff:a.people-b.people, a:a, b:b };
 }
 
-function monthRecs(year, month, group){
+function monthRecs(year, month, group, startDate, endDate){
   var prefix = year+'-'+pad2(month)+'-';
-  return state.records.filter(function(r){ return r.date.indexOf(prefix)===0 && (group==='全部'||r.group===group); });
+  var from = startDate || prefix+'01';
+  var to = endDate || (prefix+pad2(monthDays(year,month)));
+  return state.records.filter(function(r){
+    return r.date.indexOf(prefix)===0 && r.date>=from && r.date<=to && (group==='全部'||r.group===group);
+  });
 }
-function monthSummary(year, month, group){
-  var recs = monthRecs(year, month, group);
+function monthSummary(year, month, group, startDate, endDate){
+  var recs = monthRecs(year, month, group, startDate, endDate);
   var people = recs.reduce(function(s,r){ return s+(Number(r.people)||0); },0);
   var items = [];
   recs.forEach(function(r){ items = items.concat(r.items||[]); });
@@ -8811,7 +8818,7 @@ function copyTemplate(){
 }
 /* ================= 通用渲染 ================= */
 function $(id){ return document.getElementById(id); }
-var current = { page:'entry', entryDate:todayStr(), ledgerY:new Date().getFullYear(), ledgerM:new Date().getMonth()+1, reportY:new Date().getFullYear(), reportM:new Date().getMonth()+1 };
+var current = { page:'entry', entryDate:todayStr(), ledgerY:new Date().getFullYear(), ledgerM:new Date().getMonth()+1, reportY:new Date().getFullYear(), reportM:new Date().getMonth()+1, reportStart:'', reportEnd:'' };
 
 function toast(msg, type){
   var holder = $('toast-holder');
@@ -8831,7 +8838,7 @@ function switchPage(name){
   if(name==='dashboard') renderDashboard();
   else if(name==='entry') renderEntry();
   else if(name==='dining'){ renderDining(); if(syncMode()==='server') autoDiningOnLoad(); }
-  else if(name==='board') renderMonthlyBoard();
+  else if(name==='board'){ fillReportRangeFields(); renderMonthlyBoard(); }
   else if(name==='ingredients') renderIngredients();
   else if(name==='settings') renderSettings();
   window.scrollTo(0,0);
@@ -9193,20 +9200,23 @@ function renderReport(){
 function renderMonthlyBoard(){
   var y = current.reportY, m = current.reportM;
   var daysInMonth = monthDays(y,m);
-  var msAll = monthSummary(y,m,'全部');
-  var msZ = monthSummary(y,m,'职员');
-  var msY = monthSummary(y,m,'员工');
+  var range = currentReportRange();
+  var startDay = Number(range.start.slice(-2));
+  var endDay = Number(range.end.slice(-2));
+  var msAll = monthSummary(y,m,'全部',range.start,range.end);
+  var msZ = monthSummary(y,m,'职员',range.start,range.end);
+  var msY = monthSummary(y,m,'员工',range.start,range.end);
   var foodAll = msAll.mealCost;
   var foodZ = msZ.mealCost;
   var foodY = msY.mealCost;
-  var predZ = monthPredict(y,m,'职员');
-  var predY = monthPredict(y,m,'员工');
+  var predZ = monthPredict(y,m,'职员',range.start,range.end);
+  var predY = monthPredict(y,m,'员工',range.start,range.end);
   var overZ = 0, overY = 0;
 
   // 收集每日数据（职员/员工分开）
   var labels=[], actZ=[], predZArr=[], actY=[], predYArr=[], rows=[];
   var dayIdx = {};
-  for(var d=1; d<=daysInMonth; d++){
+  for(var d=startDay; d<=endDay; d++){
     var ds = y+'-'+pad2(m)+'-'+pad2(d);
     var sz = daySummary(ds,'职员');
     var sy = daySummary(ds,'员工');
@@ -9233,6 +9243,8 @@ function renderMonthlyBoard(){
     }
   }
 
+  var rangeInfo=$('report-range-info');
+  if(rangeInfo) rangeInfo.textContent='当前统计期间：'+range.start+' 至 '+range.end+'。';
   $('report-board-kpis').innerHTML =
     kpiCard('💴','总餐费', moneyC(foodAll),'员工食材费＋职员餐费用','kic-g')+
     kpiCard('👔','职员餐费用', moneyC(foodZ),'含职员消耗品','kic-b')+
@@ -9267,6 +9279,41 @@ function renderMonthlyBoard(){
   dualLineChart('report-board-chart-y', labels, actY, predYArr, {colorA:'#2563eb', colorB:'#f59e0b', nameA:'当日人均', nameB:'预测人均'});
   renderGroupTable('report-board-table-z', rows.filter(function(r){ return r.g==='职员'; }));
   renderGroupTable('report-board-table-y', rows.filter(function(r){ return r.g==='员工'; }));
+}
+function reportMonthKey(y,m){ return y+'-'+pad2(m); }
+function fillReportRangeFields(){
+  var y=current.reportY, m=current.reportM;
+  var key=reportMonthKey(y,m);
+  var ranges=(state.settings && state.settings.reportRanges) || {};
+  var saved=ranges[key] || {};
+  current.reportStart=saved.start || (key+'-01');
+  current.reportEnd=saved.end || (key+'-'+pad2(monthDays(y,m)));
+  var startEl=$('report-start'), endEl=$('report-end');
+  if(startEl) startEl.value=current.reportStart;
+  if(endEl) endEl.value=current.reportEnd;
+}
+function currentReportRange(){
+  var y=current.reportY, m=current.reportM;
+  var key=reportMonthKey(y,m);
+  var startEl=$('report-start'), endEl=$('report-end');
+  var start=(startEl && startEl.value) || current.reportStart || (key+'-01');
+  var end=(endEl && endEl.value) || current.reportEnd || (key+'-'+pad2(monthDays(y,m)));
+  if(start<key+'-01') start=key+'-01';
+  if(end>key+'-'+pad2(monthDays(y,m))) end=key+'-'+pad2(monthDays(y,m));
+  if(start>end) start=end;
+  current.reportStart=start;
+  current.reportEnd=end;
+  if(startEl) startEl.value=start;
+  if(endEl) endEl.value=end;
+  return {start:start,end:end};
+}
+function saveReportRange(){
+  var range=currentReportRange();
+  var key=reportMonthKey(current.reportY,current.reportM);
+  state.settings=state.settings||defaultSettings();
+  state.settings.reportRanges=state.settings.reportRanges||{};
+  state.settings.reportRanges[key]={start:range.start,end:range.end};
+  saveState();
 }
 /* ================= 食材库 ================= */
 var ingFilter = { q:'', cat:'' };
@@ -9412,10 +9459,11 @@ function exportXlsxAll(){
 }
 function exportMonthXlsx(){
   var y=current.reportY, m=current.reportM;
-  var group = $('report-group').value||'全部';
-  var sheets = buildMonthSheet(y,m,group);
+  var range = currentReportRange();
+  var group = '全部';
+  var sheets = buildMonthSheet(y,m,group,range.start,range.end);
   var buf = buildXlsx(sheets);
-  downloadBlob(buf, '食堂采购台账_'+y+'年'+m+'月.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  downloadBlob(buf, '食堂采购台账_'+range.start+'_至_'+range.end+'.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   toast('本月台账 Excel 已导出');
 }
 function exportJson(){
@@ -9752,16 +9800,18 @@ function buildAllSheets(){
   return sheets;
 }
 
-function buildMonthSheet(y,m,group){
+function buildMonthSheet(y,m,group,startDate,endDate){
   var sheets=[];
   var prefix = y+'-'+pad2(m)+'-';
-  var recs = state.records.filter(function(r){ return r.date.indexOf(prefix)===0 && (group==='全部'||r.group===group); }).sort(function(a,b){ return a.date.localeCompare(b.date) || a.group.localeCompare(b.group); });
+  var from=startDate||(prefix+'01'), to=endDate||(prefix+pad2(monthDays(y,m)));
+  var recs = state.records.filter(function(r){ return r.date.indexOf(prefix)===0 && r.date>=from && r.date<=to && (group==='全部'||r.group===group); }).sort(function(a,b){ return a.date.localeCompare(b.date) || a.group.localeCompare(b.group); });
   var days = monthDays(y,m);
+  var startDay=Number(from.slice(-2)), endDay=Number(to.slice(-2));
 
   // 1. 每日汇总（按 日期×人员 逐行，环比按同组上日）
   var rows = [[HDR('日期'),HDR('人员'),HDR('星期'),HDR('就餐人次'),HDR('采购金额'),HDR('食材费用'),HDR('调味料'),HDR('粮油'),HDR('人均食材'),HDR('预计人均调味料'),HDR('当日人均调味料'),HDR('预计人均粮油'),HDR('当日人均粮油'),HDR('当日人均'),HDR('预测人均'),HDR('金额环比'),HDR('人均环比')]];
   var lastBy = {};
-  for(var d=1;d<=days;d++){
+  for(var d=startDay;d<=endDay;d++){
     var ds = y+'-'+pad2(m)+'-'+pad2(d);
     var targets = [];
     if(group==='全部'){
@@ -9792,7 +9842,7 @@ function buildMonthSheet(y,m,group){
   sheets.push({name:'采购明细', rows:det});
 
   // 3. 月度汇总
-  var mon = monthSummary(y,m,group);
+  var mon = monthSummary(y,m,group,from,to);
   var prev = monthRecsPrev(y,m);
   var prevMon = monthSummary(prev.y, prev.m, group);
   var sumRows = [
@@ -9805,7 +9855,7 @@ function buildMonthSheet(y,m,group){
     ['调味料', YUAN(mon.cond), YUAN(prevMon.cond), YUAN(mon.cond-prevMon.cond)],
     ['粮油', YUAN(mon.grain), YUAN(prevMon.grain), YUAN(mon.grain-prevMon.grain)],
     ['记录数', NUM(mon.recs.length), NUM(prevMon.recs.length), NUM(mon.recs.length-prevMon.recs.length)],
-    ['预测人均（元/人·天）', YUAN(monthPredict(y,m,group)), YUAN(monthPredict(prev.y,prev.m,group)), YUAN(monthPredict(y,m,group)-monthPredict(prev.y,prev.m,group))]
+    ['预测人均（元/人·天）', YUAN(monthPredict(y,m,group,from,to)), YUAN(monthPredict(prev.y,prev.m,group)), YUAN(monthPredict(y,m,group,from,to)-monthPredict(prev.y,prev.m,group))]
   ];
   var mg = {};
   mon.recs.forEach(function(r){ mg[r.group]=1; });
@@ -10263,7 +10313,7 @@ function refreshAllDataViews(){
   if(typeof rebuildGroupSelects === 'function') rebuildGroupSelects();
   if(current.page === 'entry' && typeof renderEntry === 'function') renderEntry();
   if(current.page === 'dining' && typeof renderDiningPage === 'function') renderDiningPage();
-  if(current.page === 'board' && typeof renderMonthlyBoard === 'function') renderMonthlyBoard();
+  if(current.page === 'board' && typeof renderMonthlyBoard === 'function'){ if(typeof fillReportRangeFields === 'function') fillReportRangeFields(); renderMonthlyBoard(); }
   if(current.page === 'ingredients' && typeof renderIngredients === 'function') renderIngredients();
   if(current.page === 'settings' && typeof renderSettings === 'function') renderSettings();
 }
@@ -10527,8 +10577,10 @@ function bindEvents(){
   $('btn-next-day').addEventListener('click', function(){ var d=new Date(current.entryDate+'T00:00:00'); d.setDate(d.getDate()+1); current.entryDate = d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); renderEntry(); });
   $('btn-copy-tpl').addEventListener('click', copyTemplate);
 
-  $('report-year').addEventListener('change', function(){ current.reportY = Number($('report-year').value); renderMonthlyBoard(); });
-  $('report-month').addEventListener('change', function(){ current.reportM = Number($('report-month').value); renderMonthlyBoard(); });
+  $('report-year').addEventListener('change', function(){ current.reportY = Number($('report-year').value); fillReportRangeFields(); renderMonthlyBoard(); });
+  $('report-month').addEventListener('change', function(){ current.reportM = Number($('report-month').value); fillReportRangeFields(); renderMonthlyBoard(); });
+  $('report-start').addEventListener('change', function(){ saveReportRange(); renderMonthlyBoard(); });
+  $('report-end').addEventListener('change', function(){ saveReportRange(); renderMonthlyBoard(); });
 
   $('btn-export-all').addEventListener('click', exportXlsxAll);
   $('btn-export-month').addEventListener('click', exportMonthXlsx);
@@ -10586,6 +10638,7 @@ function init(){
   if(ldm){ current.reportY = ldm.y; current.reportM = ldm.m; }
   $('header-date').textContent = new Date().getFullYear()+' 年 '+(new Date().getMonth()+1)+' 月 '+new Date().getDate()+' 日';
   fillYearMonths();
+  fillReportRangeFields();
   fillIngCatSelect();
   rebuildDatalists();
   rebuildGroupSelects();
