@@ -9252,7 +9252,7 @@ function renderMonthlyBoard(){
   if(rangeInfo) rangeInfo.textContent='当前统计期间：'+range.start+' 至 '+range.end+'。';
   $('report-board-kpis').innerHTML =
     '<div class="board-kpi-row board-kpi-total">'+
-      kpiCard('💴','总餐费', moneyC(foodAll),'员工食材费＋职员餐费用','kic-g')+
+      kpiCard('💴','食材总费用', moneyC(foodAll),'','kic-g')+
     '</div>'+
     '<div class="board-kpi-row">'+
       kpiCard('👔','职员餐费用', moneyC(foodZ),'含职员消耗品','kic-b')+
