@@ -8958,7 +8958,7 @@ function closeModal(id){ $(id).classList.add('hidden'); }
 function dualLineChart(containerId, labels, a, b, opts){
   opts = opts||{};
   var el = $(containerId); if(!el) return;
-  var W=560,H=250,PL=52,PR=14,PT=18,PB=32;
+  var W=620,H=285,PL=52,PR=16,PT=30,PB=42;
   var maxV=1;
   a.concat(b).forEach(function(v){ if(v>maxV) maxV=v; });
   var n = labels.length;
@@ -8985,8 +8985,16 @@ function dualLineChart(containerId, labels, a, b, opts){
     pts += '<path d="'+pb.path+'" fill="none" stroke="'+(opts.colorB||'#f59e0b')+'" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>';
   }
   for(var j=0;j<n;j++){
-    pts += '<circle cx="'+pa.coords[j].x.toFixed(1)+'" cy="'+pa.coords[j].y.toFixed(1)+'" r="3" fill="#fff" stroke="'+(opts.colorA||'#2563eb')+'" stroke-width="2"/>';
-    pts += '<circle cx="'+pb.coords[j].x.toFixed(1)+'" cy="'+pb.coords[j].y.toFixed(1)+'" r="3" fill="#fff" stroke="'+(opts.colorB||'#f59e0b')+'" stroke-width="2"/>';
+    var ya=pa.coords[j].y, yb=pb.coords[j].y;
+    var upperY=Math.min(ya,yb), lowerY=Math.max(ya,yb);
+    var aAbove=ya<=yb;
+    var labelAY=Math.max(10,Math.min(H-PB-4,(aAbove?upperY-9:lowerY+14)));
+    var labelBY=Math.max(10,Math.min(H-PB-4,(aAbove?lowerY+14:upperY-9)));
+    var labelStyle='paint-order:stroke;stroke:#fff;stroke-width:2.5px;stroke-linejoin:round;font-weight:600';
+    pts += '<circle cx="'+pa.coords[j].x.toFixed(1)+'" cy="'+ya.toFixed(1)+'" r="3" fill="#fff" stroke="'+(opts.colorA||'#2563eb')+'" stroke-width="2"/>';
+    pts += '<circle cx="'+pb.coords[j].x.toFixed(1)+'" cy="'+yb.toFixed(1)+'" r="3" fill="#fff" stroke="'+(opts.colorB||'#f59e0b')+'" stroke-width="2"/>';
+    pts += '<text x="'+pa.coords[j].x.toFixed(1)+'" y="'+labelAY.toFixed(1)+'" text-anchor="middle" font-size="9" fill="'+(opts.colorA||'#2563eb')+'" style="'+labelStyle+'">'+money(a[j])+'</text>';
+    pts += '<text x="'+pb.coords[j].x.toFixed(1)+'" y="'+labelBY.toFixed(1)+'" text-anchor="middle" font-size="9" fill="'+(opts.colorB||'#f59e0b')+'" style="'+labelStyle+'">'+money(b[j])+'</text>';
     labelsXml += '<text x="'+pa.coords[j].x.toFixed(1)+'" y="'+(H-PB+16)+'" text-anchor="middle" font-size="12" fill="#6b7280">'+esc(String(labels[j]))+'</text>';
   }
   el.innerHTML = '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%">'+grid+pts+labelsXml+'</svg>'+
