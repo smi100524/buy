@@ -293,6 +293,11 @@ body{font-size:16px}
 #entry-sheet .item-row.sheet > *{min-width:0}
 #report-board-kpis .kpi .v{font-size:23px;white-space:nowrap}
 #report-board-kpis .kpi{min-width:0}
+#report-board-kpis{display:flex;flex-direction:column;gap:12px;margin:14px 0 12px}
+.board-kpi-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.board-kpi-total .kpi{grid-column:span 1}
+@media(max-width:1000px){.board-kpi-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.board-kpi-row{grid-template-columns:1fr}}
 
 .btn-sync-now{border:none;background:#fff;color:var(--primary-dark);padding:10px 16px;border-radius:10px;cursor:pointer;font-size:15px;font-weight:700;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
 .btn-sync-now:hover{background:#e8f7ef}
@@ -389,7 +394,7 @@ body{font-size:16px}
         <button class="btn btn-outline" id="btn-export-month">导出本月 Excel</button>
         <button class="btn btn-outline" id="btn-export-all">导出全部 Excel</button>
       </div>
-      <div class="kpis" id="report-board-kpis" style="grid-template-columns:repeat(auto-fit,minmax(215px,1fr));margin:14px 0 12px"></div>
+      <div id="report-board-kpis"></div>
       <div class="hint" id="report-range-info" style="margin:-2px 0 10px"></div>
       <div class="grid2" style="margin-top:8px">
         <div>
@@ -9246,15 +9251,21 @@ function renderMonthlyBoard(){
   var rangeInfo=$('report-range-info');
   if(rangeInfo) rangeInfo.textContent='当前统计期间：'+range.start+' 至 '+range.end+'。';
   $('report-board-kpis').innerHTML =
-    kpiCard('💴','总餐费', moneyC(foodAll),'员工食材费＋职员餐费用','kic-g')+
-    kpiCard('👔','职员餐费用', moneyC(foodZ),'含职员消耗品','kic-b')+
-    kpiCard('🧑','员工餐食材费', moneyC(foodY),'不含员工消耗品','kic-a')+
-    kpiCard('🎯','职员预计人均', moneyC(predZ),'','kic-b')+
-    kpiCard('🧮','职员实际人均', moneyC(msZ.perCapita),'','kic-g')+
-    kpiCard('🎯','员工预计人均', moneyC(predY),'','kic-a')+
-    kpiCard('🧮','员工当日人均', moneyC(msY.perCapita),'','kic-r')+
-    kpiCard('⚠️','职员超预警天数', String(overZ)+' 天','','kic-r')+
-    kpiCard('⚠️','员工超预警天数', String(overY)+' 天','','kic-r');
+    '<div class="board-kpi-row board-kpi-total">'+
+      kpiCard('💴','总餐费', moneyC(foodAll),'员工食材费＋职员餐费用','kic-g')+
+    '</div>'+
+    '<div class="board-kpi-row">'+
+      kpiCard('👔','职员餐费用', moneyC(foodZ),'含职员消耗品','kic-b')+
+      kpiCard('🎯','职员预计人均', moneyC(predZ),'','kic-b')+
+      kpiCard('🧮','职员实际人均', moneyC(msZ.perCapita),'','kic-g')+
+      kpiCard('⚠️','职员超预警天数', String(overZ)+' 天','','kic-r')+
+    '</div>'+
+    '<div class="board-kpi-row">'+
+      kpiCard('🧑','员工餐食材费', moneyC(foodY),'不含员工消耗品','kic-a')+
+      kpiCard('🎯','员工预计人均', moneyC(predY),'','kic-a')+
+      kpiCard('🧮','员工当日人均', moneyC(msY.perCapita),'','kic-r')+
+      kpiCard('⚠️','员工超预警天数', String(overY)+' 天','','kic-r')+
+    '</div>';
 
   function renderGroupTable(elId, gRows){
     var el = $(elId);
