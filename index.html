@@ -408,7 +408,7 @@ body{font-size:16px}
           <div class="tbl-wrap" id="report-board-table-y"></div>
         </div>
       </div>
-      <div class="hint" style="margin-top:8px">消耗品不计入食材费用、当日人均和预测人均。当日人均超过预警线（职员 12 元 / 员工 6 元，可在系统设置调整）的天数会标记 ⚠️ 超预警。</div>
+      <div class="hint" style="margin-top:8px">按统计表口径：员工人均＝员工餐食材费÷员工人数，不含消耗品；职员餐标＝职员餐费用÷职员人数，包含消耗品。超过预警线（职员 12 元 / 员工 6 元）的天数会标记 ⚠️ 超预警。</div>
     </div>
   </section>
 
@@ -8323,13 +8323,14 @@ function dayPredict(date, group){
       var p = Number(r.people)||0;
       if(p<=0) return;
       var ds = daySummary(date, r.group);
-      num += (ds.perFood + stdCond(r.group) + stdGrain(r.group)) * p;
+      num += (predictFoodCost(ds, r.group)/p + stdCond(r.group) + stdGrain(r.group)) * p;
       den += p;
     });
     return den>0 ? r2(num/den) : 0;
   }
   var ds = daySummary(date, group);
-  return r2(ds.perFood + stdCond(group) + stdGrain(group));
+  if(ds.people<=0) return 0;
+  return r2(predictFoodCost(ds, group)/ds.people + stdCond(group) + stdGrain(group));
 }
 function monthPredict(year, month, group){
   if(group==='全部'){
@@ -8339,14 +8340,14 @@ function monthPredict(year, month, group){
       if(seen[r.group]) return; seen[r.group]=1;
       var ms = monthSummary(year, month, r.group);
       if(ms.people<=0) return;
-      num += (ms.food/ms.people + stdCond(r.group) + stdGrain(r.group)) * ms.people;
+      num += (predictFoodCost(ms, r.group)/ms.people + stdCond(r.group) + stdGrain(r.group)) * ms.people;
       den += ms.people;
     });
     return den>0 ? r2(num/den) : 0;
   }
   var ms = monthSummary(year, month, group);
   if(ms.people<=0) return 0;
-  return r2(ms.food/ms.people + stdCond(group) + stdGrain(group));
+  return r2(predictFoodCost(ms, group)/ms.people + stdCond(group) + stdGrain(group));
 }
 function saveState(noAutoSync){
   try{
@@ -8363,6 +8364,14 @@ function saveState(noAutoSync){
 
 /* ================= 统计工具 ================= */
 function itemsAmount(items){ return r2((items||[]).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0)); }
+function consumableAmount(items){ return r2((items||[]).filter(function(it){ return it.category==='消耗品类'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0)); }
+/* 统计表口径：员工餐食材费不含消耗品；职员餐费用按餐标口径包含消耗品。 */
+function mealCostForRecord(rec){
+  var total = itemsAmount(rec.items||[]);
+  return r2(rec.group==='职员' ? total : total-consumableAmount(rec.items||[]));
+}
+function recordsMealCost(recs){ return r2((recs||[]).reduce(function(s,r){ return s+mealCostForRecord(r); },0)); }
+function predictFoodCost(summary, group){ return r2(summary.food + (group==='职员' ? summary.consumable : 0)); }
 function getRecord(date, group){ return state.records.find(function(r){ return r.date===date && r.group===group; }); }
 function catType(cat){ if(cat==='调料品') return '调味料'; if(cat==='油类'||cat==='米面类') return '粮油'; if(cat==='消耗品类') return '消耗品'; return '食材'; }
 
@@ -8374,13 +8383,14 @@ function daySummary(date, group){
   var total = itemsAmount(items);
   var cond = r2(items.filter(function(it){ return it.category==='调料品'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
   var grain = r2(items.filter(function(it){ return it.category==='油类'||it.category==='米面类'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
-  var consumable = r2(items.filter(function(it){ return it.category==='消耗品类'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
+  var consumable = consumableAmount(items);
+  var mealCost = recordsMealCost(recs);
   var food = r2(total-cond-grain-consumable);
-  var perCapita = people>0 ? r2((food+cond+grain)/people) : 0;
+  var perCapita = people>0 ? r2(mealCost/people) : 0;
   var perFood = people>0 ? r2(food/people) : 0;
   var perCond = people>0 ? r2(cond/people) : 0;
   var perGrain = people>0 ? r2(grain/people) : 0;
-  return { recs:recs, people:people, total:total, cond:cond, grain:grain, consumable:consumable, food:food, perCapita:perCapita, perFood:perFood, perCond:perCond, perGrain:perGrain };
+  return { recs:recs, people:people, total:total, cond:cond, grain:grain, consumable:consumable, food:food, mealCost:mealCost, perCapita:perCapita, perFood:perFood, perCond:perCond, perGrain:perGrain };
 }
 function pcText(v, people){ return people>0 ? '¥'+money(v) : '—'; }
 
@@ -8407,10 +8417,11 @@ function monthSummary(year, month, group){
   items.forEach(function(it){ var c=it.category||'未分类'; byCat[c]=(byCat[c]||0)+(Number(it.qty)||0)*(Number(it.price)||0); });
   var cond = r2(items.filter(function(it){ return it.category==='调料品'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
   var grain = r2(items.filter(function(it){ return it.category==='油类'||it.category==='米面类'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
-  var consumable = r2(items.filter(function(it){ return it.category==='消耗品类'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
+  var consumable = consumableAmount(items);
+  var mealCost = recordsMealCost(recs);
   var food = r2(total-cond-grain-consumable);
-  var perCapita = people>0 ? r2((food+cond+grain)/people) : 0;
-  return { recs:recs, people:people, total:total, cond:cond, grain:grain, consumable:consumable, food:food, byCat:byCat, perCapita:perCapita };
+  var perCapita = people>0 ? r2(mealCost/people) : 0;
+  return { recs:recs, people:people, total:total, cond:cond, grain:grain, consumable:consumable, food:food, mealCost:mealCost, byCat:byCat, perCapita:perCapita };
 }
 function monthRecsPrev(year, month){ var d=new Date(year, month-2, 1); return { y:d.getFullYear(), m:d.getMonth()+1 }; }
 /* ================= 工作台 ================= */
@@ -8533,7 +8544,9 @@ function renderEntrySheet(){
     '<div style="font-size:17px;font-weight:700">'+date.slice(5).replace('-','月')+'日 '+esc(g)+'餐总费用</div>'+
     '<div class="t-total" style="font-size:22px;font-weight:700;color:var(--primary-dark)">¥'+money(sum.total)+'</div>'+
     '<div class="t-sub" style="font-size:12px;color:var(--muted)">'+(rec?rec.items.length:0)+' 项食材 · '+sum.people+' 人次</div></div>';
-  if(sum.consumable>0){ html += '<div class="hint" style="margin-bottom:10px">采购合计含消耗品 ¥'+money(sum.consumable)+'；食材费用、当日人均和预测人均均不含消耗品。</div>'; }
+  html += '<div class="hint" style="margin-bottom:10px">'+(g==='职员'
+    ? '按统计表口径，职员当日人均包含消耗品；采购合计中的消耗品为 ¥'+money(sum.consumable)+'。'
+    : '按统计表口径，员工当日人均不含消耗品；采购合计中的消耗品为 ¥'+money(sum.consumable)+'。')+'</div>';
   if(over){ html += '<div class="warn-banner">⚠️ <b>今日人均 ¥'+money(sum.perCapita)+' 已超过预警线 ¥'+money(warnFor(g))+'（'+esc(g)+'）</b></div>'; }
   html += '<div class="tbl-wrap" style="margin-bottom:14px"><table class="tbl"><thead><tr><th style="min-width:72px"></th><th class="num">采购食材费用</th><th class="num">就餐人次</th><th class="num">人均食材费用</th><th class="num">人均粮油</th><th class="num">人均调味料</th><th class="num">当日人均</th><th class="num">预测人均</th></tr></thead><tbody>'+
     '<tr><td><b>今日</b></td><td class="num">¥'+money(sum.food)+'</td><td class="num">'+sum.people+'</td><td class="num">'+pcText(sum.perFood, sum.people)+'</td><td class="num">'+money(stdGrain(g))+'</td><td class="num">'+money(stdCond(g))+'</td><td class="num">'+(sum.people>0?(over?'<span class="cmp-up">¥'+money(sum.perCapita)+' ⚠️</span>':'¥'+money(sum.perCapita)):'—')+'</td><td class="num">'+pcText(pred, sum.people)+'</td></tr>'+
@@ -9071,7 +9084,7 @@ function openDayModal(date, group){
     '<tr><td>金额(元)</td><td class="num">'+sum.people+'</td><td class="num">¥'+money(sum.food)+'</td><td class="num">¥'+money(sum.cond)+'</td><td class="num">¥'+money(sum.grain)+'</td><td class="num" style="font-weight:700">¥'+money(sum.total)+'</td></tr>'+
     '<tr><td>当日人均(元)</td><td class="num">—</td><td class="num">'+pcText(sum.perFood, sum.people)+'</td><td class="num">'+pcText(sum.perCond, sum.people)+'</td><td class="num">'+pcText(sum.perGrain, sum.people)+'</td><td class="num" style="font-weight:700">'+pcText(sum.perCapita, sum.people)+'</td></tr>'+
     '<tr><td>预测人均(元)</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num" style="font-weight:700">¥'+money(predAll)+'</td></tr>'+
-    '</tbody></table><div class="hint">采购合计包含消耗品 ¥'+money(sum.consumable)+'；当日人均和预测人均均不含消耗品。</div></div>';
+    '</tbody></table><div class="hint">采购合计包含消耗品 ¥'+money(sum.consumable)+'。全部人员人均按统计表口径合并：员工不含消耗品，职员包含消耗品。</div></div>';
   if(!grouped.length){ html += '<div class="empty-state"><div class="big">📭</div>当日暂无记录</div>'; }
   grouped.forEach(function(rec){
     var gSum = daySummary(date, rec.group);
@@ -9183,9 +9196,9 @@ function renderMonthlyBoard(){
   var msAll = monthSummary(y,m,'全部');
   var msZ = monthSummary(y,m,'职员');
   var msY = monthSummary(y,m,'员工');
-  var foodAll = msAll.food;
-  var foodZ = msZ.food;
-  var foodY = msY.food;
+  var foodAll = msAll.mealCost;
+  var foodZ = msZ.mealCost;
+  var foodY = msY.mealCost;
   var predZ = monthPredict(y,m,'职员');
   var predY = monthPredict(y,m,'员工');
   var overZ = 0, overY = 0;
@@ -9221,9 +9234,9 @@ function renderMonthlyBoard(){
   }
 
   $('report-board-kpis').innerHTML =
-    kpiCard('💴','总食材费用', moneyC(foodAll),'','kic-g')+
-    kpiCard('👔','职员食材费用', moneyC(foodZ),'','kic-b')+
-    kpiCard('🧑','员工食材费用', moneyC(foodY),'','kic-a')+
+    kpiCard('💴','总餐费', moneyC(foodAll),'员工食材费＋职员餐费用','kic-g')+
+    kpiCard('👔','职员餐费用', moneyC(foodZ),'含职员消耗品','kic-b')+
+    kpiCard('🧑','员工餐食材费', moneyC(foodY),'不含员工消耗品','kic-a')+
     kpiCard('🎯','职员预计人均', moneyC(predZ),'','kic-b')+
     kpiCard('🧮','职员当日人均', moneyC(msZ.perCapita),'','kic-g')+
     kpiCard('🎯','员工预计人均', moneyC(predY),'','kic-a')+
@@ -9714,9 +9727,10 @@ function buildAllSheets(){
     var total = itemsAmount(items);
     var cond = r2(items.filter(function(it){ return it.category==='调料品'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
     var grain = r2(items.filter(function(it){ return it.category==='油类'||it.category==='米面类'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
-    var consumable = r2(items.filter(function(it){ return it.category==='消耗品类'; }).reduce(function(s,it){ return s+(Number(it.qty)||0)*(Number(it.price)||0); },0));
+    var consumable = consumableAmount(items);
     var food = r2(total-cond-grain-consumable);
-    monRows.push([k, NUM(people), YUAN(total), YUAN(food), YUAN(cond), YUAN(grain), YUAN(people>0?(food+cond+grain)/people:0), NUM(recs.length)]);
+    var mealCost = recordsMealCost(recs);
+    monRows.push([k, NUM(people), YUAN(total), YUAN(food), YUAN(cond), YUAN(grain), YUAN(people>0?mealCost/people:0), NUM(recs.length)]);
   });
   sheets.push({name:'月度汇总', rows:monRows});
 
@@ -9786,6 +9800,7 @@ function buildMonthSheet(y,m,group){
     ['就餐人次', NUM(mon.people), NUM(prevMon.people), NUM(mon.people-prevMon.people)],
     ['采购金额', YUAN(mon.total), YUAN(prevMon.total), YUAN(mon.total-prevMon.total)],
     ['人均费用', YUAN(mon.perCapita), YUAN(prevMon.perCapita), YUAN(mon.perCapita-prevMon.perCapita)],
+    ['餐费用（统计表口径）', YUAN(mon.mealCost), YUAN(prevMon.mealCost), YUAN(mon.mealCost-prevMon.mealCost)],
     ['食材费用', YUAN(mon.food), YUAN(prevMon.food), YUAN(mon.food-prevMon.food)],
     ['调味料', YUAN(mon.cond), YUAN(prevMon.cond), YUAN(mon.cond-prevMon.cond)],
     ['粮油', YUAN(mon.grain), YUAN(prevMon.grain), YUAN(mon.grain-prevMon.grain)],
